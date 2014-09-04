@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Date;
 import java.sql.*;
 import java.util.*;
@@ -46,8 +48,8 @@ public class StressClient implements Runnable {
     private static final Integer DEFAULT_BULK_SIZE = 100000;
     private static final Integer DEFAULT_PROCESSOR_DEGREE = 3;
     private static final Integer DEFAULT_MAX_OUTSTANDING = 10;
+    
     private static Integer THREADCOUNT=100;
-		
     private AtomicInteger requestCounter = new AtomicInteger();
     private AtomicInteger totalRequestCounter = new AtomicInteger();
     private AtomicInteger responseCounter = new AtomicInteger();
@@ -70,6 +72,10 @@ public class StressClient implements Runnable {
 		private static int iSendPeriod;
 		private static int iFailLimit;
     private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();
+    
+    private static  int reconnectLimit = 20;
+    private static  int reconnectCount = 1;
+    
 		private static byte curSeq=0;
 		class msgStatus{
 			public String sndFrom="";
@@ -159,7 +165,7 @@ public class StressClient implements Runnable {
 						}
 					}catch (Exception e){
 							e.printStackTrace();
-							sendmail("DB exception:"+e.getMessage());
+							sendmail(errorAddInfo()+"DB exception:"+"Cannot connect to Database. Exceprion Message:"+e.getMessage());
 					}finally{
 						try{
 							rs.close();
@@ -199,6 +205,21 @@ public class StressClient implements Runnable {
         logger.info("Send Thread Finished");
         smppSession.unbindAndClose();
     }
+     /*Error Mag Add information of Time,Ip Address,Error Occur Reason*/
+    
+    static String errorAddInfo(){
+    	String ip ="";
+    	
+    	try {
+			ip=InetAddress.getLocalHost().toString();
+		} catch (UnknownHostException e) {
+			ip="unknow";
+			e.printStackTrace();
+		}
+		return "Time:"+new Date()+",IP:"+ip+"," ;
+    }
+    
+    
 		/*
 		UCS2 is what you need to do.. thats natively supported by GSM and will render cyrillic variants correctly on russian GSM phones.
 Encode in big endian ordering and omit the byte order marker (BOM) at the start... google on your given APIs/libraries of choice in terms of how to convert to BE-encoded UCS2 without BOM.
@@ -356,8 +377,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								catch(NumberFormatException e) {
 										System.out.println("not send from number:"+msg.sndFrom+":");
 								}
-                try {										
-									requestCounter.incrementAndGet();
+                try {						
+                	
+                	throw new PDUException();
+									/*requestCounter.incrementAndGet();
 									long startTime = System.currentTimeMillis();
 									if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
 										byte [] b=msg.MsgBody.getBytes("iso8859-1");
@@ -390,33 +413,47 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									responseCounter.incrementAndGet();
 									if (maxDelay.get() < delay) {
 											maxDelay.set(delay);
-									}
+									}*/
                 } catch (PDUException e) {
                     logger.error("Failed submit short message PDUException '" + message + "'", e);
                     System.out.println("Failed submit short message  PDUException'" + message + "'"+ e);
-										sendmail("send to gateway exception:"+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
                     //shutdown();
                 } catch (ResponseTimeoutException e) {
                     logger.error("Failed submit short message  ResponseTimeoutException'" + message + "'", e);
-										sendmail("send to gateway exception:"+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
                     //shutdown();
                 } catch (InvalidResponseException e) {
                     logger.error("Failed submit short message InvalidResponseException'" + message + "'", e);
-										sendmail("send to gateway exception:"+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
                     //shutdown();
                 } catch (NegativeResponseException e) {
                     logger.error("Failed submit short message NegativeResponseException'" + message + "'", e);
-										sendmail("send to gateway exception:"+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
                     //shutdown();
                 } catch (IOException e) {
                     logger.error("Failed submit short message IOException '" + message + "'", e);
-										sendmail("send to gateway exception:"+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because cannot get message body. Exception Message: "+e.getMessage());
                     //shutdown();
                 } catch (Exception e){
 									logger.error("Failed submit short message Exception'" + message + "'", e);
-									sendmail("send to gateway exception:"+e.getMessage());
+									sendmail(errorAddInfo()+"send to gateway exception:"+e.getMessage());
 								}finally{
 									requestCounter.decrementAndGet();
+									
+									//try connect again
+									if(reconnectCount<=reconnectLimit){
+										try {
+								            smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,
+								                    password, "cln", TypeOfNumber.UNKNOWN,
+								                    NumberingPlanIndicator.UNKNOWN, null);
+								            logger.info(reconnectCount+"th Retry Bound to " + host + ":" + port);
+								        } catch (IOException e) {
+								            logger.error("Failed reinitialize connection or bind", e);
+								            return;
+								        }
+										//reconnectCount++;
+									}
 								}
             }
         };
@@ -595,7 +632,9 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         String destinationAddr = "";
         if (args.length > 0) {
             try {
+            	
                 THREADCOUNT = Integer.parseInt(args[0]);
+                throw new NumberFormatException();
             }
             catch(NumberFormatException e) {
                 System.out.println("Must enter integer as first argument.");
