@@ -42,7 +42,7 @@ public class StressClient implements Runnable {
     private static final String DEFAULT_SYSID = "17life";
     private static final Logger logger = LoggerFactory.getLogger(StressClient.class);
     private static final String DEFAULT_LOG4J_PATH = "client-log4j.properties";
-    private static final String DEFAULT_HOST = "202.133.250.238";
+    private static final String DEFAULT_HOST = "10.42.1.163";
     private static final Integer DEFAULT_PORT = 2775;
     private static final Long DEFAULT_TRANSACTIONTIMER = 2000L;
     private static final Integer DEFAULT_BULK_SIZE = 100000;
@@ -211,7 +211,7 @@ public class StressClient implements Runnable {
     	String ip ="";
     	
     	try {
-			ip=InetAddress.getLocalHost().toString();
+			ip=InetAddress.getLocalHost()+"";
 		} catch (UnknownHostException e) {
 			ip="unknow";
 			e.printStackTrace();
@@ -269,7 +269,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				//passing msgPart array for shortMessage 
 				//argument and esm for ESMClass argument
 				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm           , (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, msgPart);
-				System.out.println(rspIDs[i]);
+				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
+				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 			}
 			if (remain==1){
 				udh[5]=(byte)(i+1);
@@ -278,7 +279,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				System.arraycopy(msgBytes, i*134, msgPartRemain , 6, (msgBytes.length%134));
 				System.out.println("sending parts:"+msgPartRemain[0]+","+msgPartRemain[1]+","+msgPartRemain[2]+","+msgPartRemain[3]+","+msgPartRemain[4]+","+msgPartRemain[5]);
 				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, msgPartRemain);
-				System.out.println(rspIDs[i]);
+				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
+				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 			}
 			//Thread.sleep(2000);
 			//for (int j=0;j<i;j++){
@@ -329,7 +331,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				//passing msgPart array for shortMessage 
 				//argument and esm for ESMClass argument
 				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msgPart);
-				System.out.println(rspIDs[i]);
+				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
+				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 			}
 			if (remain==1){
 				udh[5]=(byte)(i+1);
@@ -338,7 +341,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				System.arraycopy(msgBytes, i*154, msgPartRemain , 6, (msgBytes.length%154));
 				System.out.println("sending parts:"+msgPartRemain[0]+","+msgPartRemain[1]+","+msgPartRemain[2]+","+msgPartRemain[3]+","+msgPartRemain[4]+","+msgPartRemain[5]);
 				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msgPartRemain);
-				System.out.println(rspIDs[i]);
+				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
+				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 			}
 			//Thread.sleep(2000);
 			//for (int j=0;j<i;j++){
@@ -364,6 +368,25 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				System.out.println("send mail fail:"+msg);
 			}
 		}
+		
+		void reconnect(){
+			//try connect again
+			if(reconnectCount<=reconnectLimit){
+				try {
+		            smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,
+		                    password, "cln", TypeOfNumber.UNKNOWN,
+		                    NumberingPlanIndicator.UNKNOWN, null);
+		            logger.info(reconnectCount+"th Retry Bound to " + host + ":" + port);
+		            System.out.println(reconnectCount+"th Retry Bound to " + host + ":" + port);
+		        } catch (IOException e) {
+		            logger.error("Failed reinitialize connection or bind", e);
+		            System.out.println(reconnectCount+"th retry Bound is Failed reinitialize connection or bind");
+		            return;
+		        }
+				reconnectCount++;
+			}
+		}
+		
     private Runnable newSendTask(final msgStatus msg) {
         return new Runnable() {
             public void run() {
@@ -379,8 +402,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								}
                 try {						
                 	
-                	throw new PDUException();
-									/*requestCounter.incrementAndGet();
+									requestCounter.incrementAndGet();
 									long startTime = System.currentTimeMillis();
 									if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
 										byte [] b=msg.MsgBody.getBytes("iso8859-1");
@@ -390,7 +412,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 											msg.status=sendAsciiLong(b,msg);
 										}else{
 											rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
-											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);										
+											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);		
+											logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
 											msg.rspID=rspMsgID;
 											msg.status=97;
 										}
@@ -404,7 +427,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 											byte[] c=new byte[b.length-2];
 											System.arraycopy(b, 2, c , 0, c.length);
 											rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, c);
-											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);										
+											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);
+											logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
 											msg.rspID=rspMsgID;
 											msg.status=97;
 										}
@@ -413,27 +437,31 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									responseCounter.incrementAndGet();
 									if (maxDelay.get() < delay) {
 											maxDelay.set(delay);
-									}*/
+									}
+									
                 } catch (PDUException e) {
                     logger.error("Failed submit short message PDUException '" + message + "'", e);
-                    System.out.println("Failed submit short message  PDUException'" + message + "'"+ e);
 										sendmail(errorAddInfo()+"send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
+										reconnect();
                     //shutdown();
                 } catch (ResponseTimeoutException e) {
                     logger.error("Failed submit short message  ResponseTimeoutException'" + message + "'", e);
 										sendmail(errorAddInfo()+"send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
+										reconnect();
                     //shutdown();
                 } catch (InvalidResponseException e) {
                     logger.error("Failed submit short message InvalidResponseException'" + message + "'", e);
 										sendmail(errorAddInfo()+"send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
+										reconnect();
                     //shutdown();
                 } catch (NegativeResponseException e) {
                     logger.error("Failed submit short message NegativeResponseException'" + message + "'", e);
 										sendmail(errorAddInfo()+"send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
+										reconnect();
                     //shutdown();
                 } catch (IOException e) {
                     logger.error("Failed submit short message IOException '" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because cannot get message body. Exception Message: "+e.getMessage());
+										sendmail(errorAddInfo()+"send to gateway exception:"+"Because cannot get message body. Exception Message: "+e.getMessage());		
                     //shutdown();
                 } catch (Exception e){
 									logger.error("Failed submit short message Exception'" + message + "'", e);
@@ -441,19 +469,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								}finally{
 									requestCounter.decrementAndGet();
 									
-									//try connect again
-									if(reconnectCount<=reconnectLimit){
-										try {
-								            smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,
-								                    password, "cln", TypeOfNumber.UNKNOWN,
-								                    NumberingPlanIndicator.UNKNOWN, null);
-								            logger.info(reconnectCount+"th Retry Bound to " + host + ":" + port);
-								        } catch (IOException e) {
-								            logger.error("Failed reinitialize connection or bind", e);
-								            return;
-								        }
-										//reconnectCount++;
-									}
 								}
             }
         };
@@ -666,8 +681,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				iFailLimit=Integer.parseInt(FailLimit);
 				SendPeriod=prop.getProperty("SendPeriod");
 				iSendPeriod=Integer.parseInt(SendPeriod);
-				AlertMailTo=prop.getProperty("AlertMailTo");
+				//AlertMailTo=prop.getProperty("AlertMailTo");
+				AlertMailTo="k1988242001@gmail.com";
         String log4jPath =DEFAULT_LOG4J_PATH;
+        System.out.println(log4jPath);
         PropertyConfigurator.configure(log4jPath);
         logger.info("Target server {}:{}", host, port);
         logger.info("System ID: {}", systemId);
