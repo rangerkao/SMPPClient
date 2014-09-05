@@ -681,10 +681,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				iFailLimit=Integer.parseInt(FailLimit);
 				SendPeriod=prop.getProperty("SendPeriod");
 				iSendPeriod=Integer.parseInt(SendPeriod);
-				//AlertMailTo=prop.getProperty("AlertMailTo");
-				AlertMailTo="k1988242001@gmail.com";
+				AlertMailTo=prop.getProperty("AlertMailTo");
         String log4jPath =DEFAULT_LOG4J_PATH;
-        System.out.println(log4jPath);
         PropertyConfigurator.configure(log4jPath);
         logger.info("Target server {}:{}", host, port);
         logger.info("System ID: {}", systemId);
