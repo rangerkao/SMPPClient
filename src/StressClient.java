@@ -466,6 +466,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
                 } catch (Exception e){
 									logger.error("Failed submit short message Exception'" + message + "'", e);
 									sendmail(errorAddInfo()+"send to gateway exception:"+e.getMessage());
+									reconnect();
 								}finally{
 									requestCounter.decrementAndGet();
 									
