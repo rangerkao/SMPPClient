@@ -320,7 +320,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					ton = TypeOfNumber.INTERNATIONAL;
 			}
 			catch(NumberFormatException e) {
-					System.out.println("not send from number:"+msg.sndFrom+":");
+					System.out.println("not send from number:"+msg.sndFrom+":"+e.getMessage());
 			}
 			for (i=0;i<parts-remain;i++){
 				udh[5]=(byte)(i+1); //this part's number in the sequence
@@ -386,6 +386,9 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				reconnectCount++;
 			}
 		}
+		void parseSMPPResponse(final msgStatus msg){
+			
+		}
 		
     private Runnable newSendTask(final msgStatus msg) {
         return new Runnable() {
@@ -400,72 +403,77 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								catch(NumberFormatException e) {
 										System.out.println("not send from number:"+msg.sndFrom+":");
 								}
-                try {						
+                try {
+                	if(msg.MsgBody==null)
+                		throw new Exception("MsgBodyisNull!");	
                 	
-									requestCounter.incrementAndGet();
-									long startTime = System.currentTimeMillis();
-									if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
-										byte [] b=msg.MsgBody.getBytes("iso8859-1");
-										if (b.length>160){
-											System.out.println("submitted long ASCII:"+msg.sndTo+",length:"+b.length);
-											msg.rspID="--";
-											msg.status=sendAsciiLong(b,msg);
-										}else{
-											rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
-											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);		
-											logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
-											msg.rspID=rspMsgID;
-											msg.status=97;
-										}
-									}else{
-										byte [] b=msg.MsgBody.getBytes("UTF16");
-										if (msg.MsgBody.length()>70){
-											System.out.println("submitted long UTF16:"+msg.sndTo+",length:"+b.length);
-											msg.rspID="--";
-											msg.status=sendLong(b,msg);
-										}else{
-											byte[] c=new byte[b.length-2];
-											System.arraycopy(b, 2, c , 0, c.length);
-											rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, c);
-											System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);
-											logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
-											msg.rspID=rspMsgID;
-											msg.status=97;
-										}
-									}
-									long delay = System.currentTimeMillis() - startTime;
-									responseCounter.incrementAndGet();
-									if (maxDelay.get() < delay) {
-											maxDelay.set(delay);
-									}
+					requestCounter.incrementAndGet();
+					long startTime = System.currentTimeMillis();
+					if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
+						byte [] b=msg.MsgBody.getBytes("iso8859-1");
+						if (b.length>160){
+							System.out.println("submitted long ASCII:"+msg.sndTo+",length:"+b.length);
+							msg.rspID="--";
+							msg.status=sendAsciiLong(b,msg);
+						}else{
+							rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
+							System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);		
+							logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
+							msg.rspID=rspMsgID;
+							msg.status=97;
+						}
+					}else{
+						byte [] b=msg.MsgBody.getBytes("UTF16");
+						if (msg.MsgBody.length()>70){
+							System.out.println("submitted long UTF16:"+msg.sndTo+",length:"+b.length);
+							msg.rspID="--";
+							msg.status=sendLong(b,msg);
+						}else{
+							byte[] c=new byte[b.length-2];
+							System.arraycopy(b, 2, c , 0, c.length);
+							rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, c);
+							System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);
+							logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
+							msg.rspID=rspMsgID;
+							msg.status=97;
+						}
+					}
+					long delay = System.currentTimeMillis() - startTime;
+					responseCounter.incrementAndGet();
+					if (maxDelay.get() < delay) {
+							maxDelay.set(delay);
+					}
+					//new code for parsing response
+					parseSMPPResponse(msg);
 									
                 } catch (PDUException e) {
                     logger.error("Failed submit short message PDUException '" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
+										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
 										reconnect();
                     //shutdown();
                 } catch (ResponseTimeoutException e) {
                     logger.error("Failed submit short message  ResponseTimeoutException'" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
+										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
 										reconnect();
                     //shutdown();
                 } catch (InvalidResponseException e) {
                     logger.error("Failed submit short message InvalidResponseException'" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
+										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
 										reconnect();
                     //shutdown();
                 } catch (NegativeResponseException e) {
                     logger.error("Failed submit short message NegativeResponseException'" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
+										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
 										reconnect();
                     //shutdown();
                 } catch (IOException e) {
                     logger.error("Failed submit short message IOException '" + message + "'", e);
-										sendmail(errorAddInfo()+"send to gateway exception:"+"Because cannot get message body. Exception Message: "+e.getMessage());		
+										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because IO Problem. Exception Message: "+e.getMessage());
+										reconnect();
                     //shutdown();
                 } catch (Exception e){
 									logger.error("Failed submit short message Exception'" + message + "'", e);
-									sendmail(errorAddInfo()+"send to gateway exception:"+e.getMessage());
+									sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+e.getMessage());
 									reconnect();
 								}finally{
 									requestCounter.decrementAndGet();
