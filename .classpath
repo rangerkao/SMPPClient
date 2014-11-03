@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/jsmpp-2.1.0.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/jsmpp-examples.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/lib/log4j-1.2.14.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/lib/testng-5.7-jdk15.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/lib/slf4j-api-1.4.3.jar"/>
-	<classpathentry kind="lib" path="C:/Users/ranger.kao/Downloads/jsmpp-2.1.0-all/jsmpp-2.1.0/lib/slf4j-log4j12-1.4.3.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/log4j-1.2.14.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-api-1.4.3.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-log4j12-1.4.3.jar"/>
+	<classpathentry kind="lib" path="lib/testng-5.7-jdk15.jar"/>
+	<classpathentry kind="lib" path="lib/jsmpp-2.1.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
