@@ -7,5 +7,6 @@
 	<classpathentry kind="lib" path="lib/slf4j-log4j12-1.4.3.jar"/>
 	<classpathentry kind="lib" path="lib/testng-5.7-jdk15.jar"/>
 	<classpathentry kind="lib" path="lib/jsmpp-2.1.0.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
