@@ -728,6 +728,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							if (id.status != 2) {
 								id.fails++;
 
+								//proccess senfrom
 								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
 								try {
 									long c = Long.parseLong(id.sndFrom);
@@ -737,116 +738,132 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 											+ id.sndFrom + ":");
 								}
 
-								boolean drlivery = true;
-								boolean rejected = false;
-								boolean requeryStatus = false;
-								for (longmsgStatus l : id.rspIDs) {
-									try {
-										QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-										l.status = q4.getMessageState().value();
-										System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
-										if (l.status == 0) {
-											l.status = 97;
-										}
-										// 20141103 only check 0,1.
-										if (l.status == 2 || l.status == 3 || l.status == 4|| l.status == 5|| l.status == 6 || l.status == 7|| l.status == 8|| l.status == 9) {
-											System.out.println("part "+l.part+" is  final status!");
-											if (q4.getMessageState() != MessageState.DELIVERED) {
-												drlivery = false;
-												// Give main status of sms,order by Delivered,Rejected,Undeliverable
-												if (q4.getMessageState() == MessageState.REJECTED) {
-													rejected = true;
-												}
+								//query status
+								
+								
+								try {
+									PreparedStatement pst;
+									pst = conn.prepareStatement(sql2);
+									
+									for (longmsgStatus l : id.rspIDs) {
+										try {
+											QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+											l.status = q4.getMessageState().value();
+											System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+											if (l.status == 0) {
+												l.status = 97;
 											}
-
-											str = "20" + q4.getFinalDate();
-											str = str.substring(0,str.length() - 4);
-
-										} else {
-											// contain enroute status
-											drlivery = false;
-											requeryStatus = true;
-											System.out.println("part "+l.part+" is not final status!");
-										}
-									} catch (NegativeResponseException e3) {
-										if (e3.getMessage().indexOf("67") == -1) {
-											logger.info("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
-											System.out.println("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
+											//update
+											if (l.inserted) {
+												
+												pst.setInt(1, l.status);
+												pst.setString(2, str);
+												pst.setString(3, l.rspID);
+												pst.setString(4, l.MsgID);
+												pst.setInt(5, l.MsgSeq);
+												pst.setInt(6, l.part);
+											} else {
+												pst = conn.prepareStatement(sql3);
+												pst.setString(1, l.MsgID);
+												pst.setInt(2, l.MsgSeq);
+												pst.setInt(3, l.part);
+												pst.setInt(4, l.status);
+												pst.setString(5, str);
+												pst.setString(6, l.rspID);
+												l.inserted = true;
+											}
+											pst.executeUpdate();
+											
+										} catch (NegativeResponseException e3) {
+											if (e3.getMessage().indexOf("67") == -1) {
+												logger.info("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
+												System.out.println("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
+												sendmail("queryShortMessage exception:"
+														+ e3.getMessage());
+											}
+										} catch (Exception e2) {
+											logger.info("queryShortMessage "+ l.MsgID + "," + l.MsgSeq+ "," + l.part+ " Exception..."+ e2.getMessage());
+											System.out.println("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e2.getMessage());
 											sendmail("queryShortMessage exception:"
-													+ e3.getMessage());
+													+ e2.getMessage());
+	
+											reconnect(null);
 										}
-									} catch (Exception e2) {
-										logger.info("queryShortMessage "+ l.MsgID + "," + l.MsgSeq+ "," + l.part+ " Exception..."+ e2.getMessage());
-										System.out.println("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e2.getMessage());
-										sendmail("queryShortMessage exception:"
-												+ e2.getMessage());
-
-										reconnect(null);
 									}
-
-									// insert or update Data
+									pst.close();
+								} catch (SQLException e) {
+									logger.info("QueryResultThread Exception..."
+											+ e.getMessage());
+									e.printStackTrace();
 									try {
-										System.out.println("insert or update SMS sm="+ l.MsgID+ ",seq="+ l.MsgSeq+ ",part="+ l.part+ ",status="+ l.status);
-										PreparedStatement pst;
-										if (l.inserted) {
-											pst = conn.prepareStatement(sql2);
-											pst.setInt(1, l.status);
-											pst.setString(2, str);
-											pst.setString(3, l.rspID);
-											pst.setString(4, l.MsgID);
-											pst.setInt(5, l.MsgSeq);
-											pst.setInt(6, l.part);
-										} else {
-											pst = conn.prepareStatement(sql3);
-											pst.setString(1, l.MsgID);
-											pst.setInt(2, l.MsgSeq);
-											pst.setInt(3, l.part);
-											pst.setInt(4, l.status);
-											pst.setString(5, str);
-											pst.setString(6, l.rspID);
-											l.inserted = true;
-										}
-										pst.executeUpdate();
-										pst.close();
-									} catch (SQLException e) {
-										logger.info("QueryResultThread Exception..."
-												+ e.getMessage());
-										e.printStackTrace();
-										try {
-											ps.close();
-											conn.close();
-										} catch (SQLException e1) {
-										}
-										try {
-											conn = DriverManager
-													.getConnection(
-															"jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8",
-															"smpper", "SmIpp3r");
-											ps = conn.prepareStatement(sql);
-										} catch (SQLException e1) {
-										}
+										ps.close();
+										conn.close();
+									} catch (SQLException e1) {
+									}
+									try {
+										conn = DriverManager
+												.getConnection(
+														"jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8",
+														"smpper", "SmIpp3r");
+										ps = conn.prepareStatement(sql);
+									} catch (SQLException e1) {
 									}
 								}
 
 								// need recheck status,set main status 1 enroute
-								if (requeryStatus) {
+								
+								boolean reCheck=false;
+								boolean haveUndilivered=false;
+								boolean reject=false;
+								boolean undiliverable=false;
+								for (longmsgStatus l : id.rspIDs) {
+									
+									if(l.status!=2){
+										haveUndilivered=true;
+									}
+									if(l.status==0 || l.status==1){
+										reCheck=true;
+									}
+									if(l.status==8){
+										reject=true;
+									}
+									if(l.status==5){
+										undiliverable=true;
+									}
+									
+								}
+								
+								if(reCheck){
 									System.out.println("need recheck!");
 									id.status = 1;
-
-								} else {
+								}else{
 									System.out.println("need not recheck!");
 									synchronized (qryMsg) {
 										qryMsg.remove(id);
 										j--;
 									}
-									if (drlivery) {
+									
+									if (!haveUndilivered) {
 										id.status = 2;
-									} else if (rejected) {
+									} else if (reject) {
 										id.status = 8;
 									} else {
 										id.status = 5;
 									}
+									
 								}
+								
+								/*if (requeryStatus) {
+									
+
+								} else {
+									
+									synchronized (qryMsg) {
+										qryMsg.remove(id);
+										j--;
+									}
+									
+								}*/
 							} else {
 								synchronized (qryMsg) {
 									qryMsg.remove(id);
