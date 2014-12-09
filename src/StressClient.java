@@ -508,9 +508,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							byte [] b=msg.MsgBody.getBytes("iso8859-1");
 							if (b.length>160){
 								System.out.println("submitted long ASCII:"+msg.sndTo+",length:"+b.length);
+								sendAsciiLong(b,msg);
 								rspMsgID="--";
 								msg.rspID=rspMsgID;
-								msg.status=sendAsciiLong(b,msg);
+								msg.status=97;
+										
 							}else{
 								rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
 								System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);		
@@ -522,9 +524,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							byte [] b=msg.MsgBody.getBytes("UTF16");
 							if (msg.MsgBody.length()>70){
 								System.out.println("submitted long UTF16:"+msg.sndTo+",length:"+b.length);
+								sendLong(b,msg);
 								rspMsgID="--";
 								msg.rspID=rspMsgID;
-								msg.status=sendLong(b,msg);
+								msg.status=97;		
 							}else{
 								byte[] c=new byte[b.length-2];
 								System.arraycopy(b, 2, c , 0, c.length);
@@ -669,9 +672,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									// if (q4.getMessageState() ==
 									// MessageState.DELIVERED) {
 									// 20141103 2 to 9 is final status
+									// 20141112 7 is not final status,assume smpp center have not process yet
 									if (id.status == 2 || id.status == 3
 											|| id.status == 4 || id.status == 5
-											|| id.status == 6 || id.status == 7
+											|| id.status == 6 //|| id.status == 7
 											|| id.status == 8 || id.status == 9) {
 										str = "20" + q4.getFinalDate();
 										str = str
@@ -739,40 +743,64 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								}
 
 								//query status
-								
-								
+								boolean reCheck=false;
+								boolean haveUndilivered=false;
+								boolean reject=false;
+								System.out.println("for long SMS rspIDs length is "+id.rspIDs.length);
 								try {
-									PreparedStatement pst;
-									pst = conn.prepareStatement(sql2);
+									PreparedStatement pst = null;
 									
-									for (longmsgStatus l : id.rspIDs) {
+									for(int i=0;i<id.rspIDs.length;i++){
+										longmsgStatus l= id.rspIDs[i];
 										try {
-											QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-											l.status = q4.getMessageState().value();
-											System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
-											if (l.status == 0) {
-												l.status = 97;
-											}
-											//update
-											if (l.inserted) {
+											System.out.println("query "+i+" part"+" "+l.rspID);
+											if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
+												System.out.println("check point 1!");
+												QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+												System.out.println("check point 2!");
+												l.status = q4.getMessageState().value();
+												System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+												if (l.status == 0) {
+													l.status = 97;
+												}
+												//update
+												if (l.inserted) {
+													pst = conn.prepareStatement(sql2);
+													pst.setInt(1, l.status);
+													pst.setString(2, str);
+													pst.setString(3, l.rspID);
+													pst.setString(4, l.MsgID);
+													pst.setInt(5, l.MsgSeq);
+													pst.setInt(6, l.part);
+												} else {
+													pst = conn.prepareStatement(sql3);
+													pst.setString(1, l.MsgID);
+													pst.setInt(2, l.MsgSeq);
+													pst.setInt(3, l.part);
+													pst.setInt(4, l.status);
+													pst.setString(5, str);
+													pst.setString(6, l.rspID);
+													l.inserted = true;
+												}
+												pst.executeUpdate();
 												
-												pst.setInt(1, l.status);
-												pst.setString(2, str);
-												pst.setString(3, l.rspID);
-												pst.setString(4, l.MsgID);
-												pst.setInt(5, l.MsgSeq);
-												pst.setInt(6, l.part);
-											} else {
-												pst = conn.prepareStatement(sql3);
-												pst.setString(1, l.MsgID);
-												pst.setInt(2, l.MsgSeq);
-												pst.setInt(3, l.part);
-												pst.setInt(4, l.status);
-												pst.setString(5, str);
-												pst.setString(6, l.rspID);
-												l.inserted = true;
+												if(l.status!=2){
+													haveUndilivered=true;
+												}
+												if(l.status==0 || l.status==1 || l.status==7){
+													reCheck=true;
+												}
+												if(l.status==8){
+													reject=true;
+												}		
+											}else{
+												logger.info("No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
+												System.out.println("No response ID " + l.MsgID+ "," + l.MsgSeq + l.part+"...");
+												synchronized (qryMsg) {
+													qryMsg.remove(id);
+													j--;
+												}
 											}
-											pst.executeUpdate();
 											
 										} catch (NegativeResponseException e3) {
 											if (e3.getMessage().indexOf("67") == -1) {
@@ -781,6 +809,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 												sendmail("queryShortMessage exception:"
 														+ e3.getMessage());
 											}
+											reCheck=true;
 										} catch (Exception e2) {
 											logger.info("queryShortMessage "+ l.MsgID + "," + l.MsgSeq+ "," + l.part+ " Exception..."+ e2.getMessage());
 											System.out.println("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e2.getMessage());
@@ -788,9 +817,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 													+ e2.getMessage());
 	
 											reconnect(null);
+											reCheck=true;
 										}
 									}
-									pst.close();
+									if(pst!=null)
+										pst.close();
 								} catch (SQLException e) {
 									logger.info("QueryResultThread Exception..."
 											+ e.getMessage());
@@ -810,28 +841,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									}
 								}
 
-								// need recheck status,set main status 1 enroute
-								
-								boolean reCheck=false;
-								boolean haveUndilivered=false;
-								boolean reject=false;
-								boolean undiliverable=false;
-								for (longmsgStatus l : id.rspIDs) {
-									
-									if(l.status!=2){
-										haveUndilivered=true;
-									}
-									if(l.status==0 || l.status==1){
-										reCheck=true;
-									}
-									if(l.status==8){
-										reject=true;
-									}
-									if(l.status==5){
-										undiliverable=true;
-									}
-									
-								}
 								
 								if(reCheck){
 									System.out.println("need recheck!");
