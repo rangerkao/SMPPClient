@@ -31,9 +31,10 @@ public class ResponseBatch {
 	private static int post_period_Time = 1;
 	private static final String DEFAULT_LOG4J_PATH = "client-log4j.properties";
 	private static String AlertMailTo;
-	
-	public static void main(String[] args) throws IOException {
-		
+	private static String resURL;
+	public static void main(String[] args) throws IOException, ClassNotFoundException {
+		Class.forName("org.postgresql.Driver");
+		DriverManager.setLoginTimeout(10);
 		Properties prop = new Properties();
         FileInputStream fis;
         
@@ -41,13 +42,15 @@ public class ResponseBatch {
 		prop.load(fis);
 		fis.close();
 		period_Time = Integer.parseInt(prop.getProperty("Batch_period_Time"));
-		AlertMailTo=prop.getProperty("AlertMailTo");
+		AlertMailTo = prop.getProperty("AlertMailTo");
+		resURL = prop.getProperty("response_URL");
 		String log4jPath =DEFAULT_LOG4J_PATH;
 		PropertyConfigurator.configure(log4jPath);
 		
 		logger.info("Load Propties success :"+
 					"\nperiod_Time="+period_Time+
-					"\nAlertMailTo="+AlertMailTo);
+					"\nAlertMailTo="+AlertMailTo+
+					"\nResponseURL="+resURL);
 
 
 		ResponseBatch re=new ResponseBatch();
@@ -117,13 +120,14 @@ public class ResponseBatch {
 			String charset=null;
 			for(res r : resList){
 				
-				url="http://www.17life.com/Service/S2TCallback.ashx";
+				//url="http://www.17life.com/Service/S2TCallback.ashx";
+				url = resURL;
 				param="msgID="+r.msgid.replace("=", "%3D")+"&phone="+r.phoneno+"&status="+r.status+"&acktime="+r.acktime;
 				charset=null;
 				
 				try {
 					r.sendResult=String.valueOf(HttpPost(url,param,charset));
-					if("200".equals(r.sendResult))
+					if(!"200".equals(r.sendResult))
 						throw new IOException("Post not success Error");
 				} catch (IOException e) {
 					logger.error("post "+url+"?"+param+" error at "+new Date(),e);

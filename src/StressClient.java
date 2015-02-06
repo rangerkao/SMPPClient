@@ -43,7 +43,7 @@ public class StressClient implements Runnable {
     private static final String DEFAULT_SYSID = "17life";
     private static final Logger logger = LoggerFactory.getLogger(StressClient.class);
     private static final String DEFAULT_LOG4J_PATH = "client-log4j.properties";
-    private static final String DEFAULT_HOST = "10.42.1.163";
+    private static  String DEFAULT_HOST = "10.42.1.163";
     private static final Integer DEFAULT_PORT = 2775;
     private static final Long DEFAULT_TRANSACTIONTIMER = 2000L;
     private static final Integer DEFAULT_BULK_SIZE = 100000;
@@ -138,7 +138,11 @@ public class StressClient implements Runnable {
             return;
         }
         //new TrafficWatcherThread().start();
-				new QueryResultThread().start();
+        Thread Qt=new QueryResultThread();
+        Qt.start();
+        
+ 
+				//new QueryResultThread().start();
 				
 				Connection conn = null;
 				PreparedStatement ps=null;
@@ -163,7 +167,10 @@ public class StressClient implements Runnable {
 						smppSession.close();*/
 					String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date());
 					//20141103 add status 95 (sended result fail)
-					String sqlUpdate="update msgitem set status=98 where (schedule<='"+str+"' or schedule='0') and (status=0 or status=99 or status=95) and tries<"+RetryLimit;
+					//String sqlUpdate="update msgitem set status=98 where (schedule<='"+str+"' or schedule='0') and (status=0 or status=99 or status=95) and tries<"+RetryLimit;
+					//20150129 modified
+					String sqlUpdate="update msgitem set status=98 where (schedule<='"+str+"' or schedule='0') and (status=0 or status=99 or status=95) ";
+					
 					//String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries from messages m, msgitem i where m.msgid=i.msgid and (schedule<='"+str+"' or schedule='0') and (status=0 or status=99) and tries<"+RetryLimit;
 					
 					//20141030 added! select with limited number
@@ -252,7 +259,7 @@ public class StressClient implements Runnable {
     	String ip ="";
     	
     	try {
-			ip=InetAddress.getLocalHost()+"";
+			ip=InetAddress.getLocalHost().getHostAddress()+"";
 		} catch (UnknownHostException e) {
 			ip="unknow";
 			e.printStackTrace();
@@ -496,8 +503,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					logger.debug("smppSession state is Bounded!");
 				}else{
 					if(msgID!=null){
-						logger.error(errorAddInfo()+"The "+msgID+" Msg cannot send!");
-						sendmail(errorAddInfo()+"The "+msgID+" Msg cannot send!");
+						logger.error(errorAddInfo()+" The "+msgID+" Msg cannot send!");
+						sendmail(errorAddInfo()+" The "+msgID+" Msg cannot send!");
 					}
 				}
 			}
@@ -532,7 +539,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
 							byte [] b=msg.MsgBody.getBytes("iso8859-1");
 							if (b.length>160){
-								System.out.println("submitted long ASCII:"+msg.sndTo+",length:"+b.length);
+								System.out.println("submitted long ASCII:"+msg.sndTo+",length:"+b.length+",seq:"+msg.MsgSeq);
 								sendAsciiLong(b,msg);
 								rspMsgID="--";
 								msg.rspID=rspMsgID;
@@ -540,15 +547,15 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 										
 							}else{
 								rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
-								System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);		
-								logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
+								System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID+",seq:"+msg.MsgSeq);		
+								logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID+",seq:"+msg.MsgSeq);
 								msg.rspID=rspMsgID;
 								msg.status=97;
 							}
 						}else{
 							byte [] b=msg.MsgBody.getBytes("UTF16");
 							if (msg.MsgBody.length()>70){
-								System.out.println("submitted long UTF16:"+msg.sndTo+",length:"+b.length);
+								System.out.println("submitted long UTF16:"+msg.sndTo+",length:"+b.length+",seq:"+msg.MsgSeq);
 								sendLong(b,msg);
 								rspMsgID="--";
 								msg.rspID=rspMsgID;
@@ -557,8 +564,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								byte[] c=new byte[b.length-2];
 								System.arraycopy(b, 2, c , 0, c.length);
 								rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, c);
-								System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID);
-								logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID);
+								System.out.println("submitted:"+msg.sndTo+",rspid:"+rspMsgID+",seq:"+msg.MsgSeq);
+								logger.info("The SM "+msg.MsgID+" has rspIDs "+rspMsgID+",seq:"+msg.MsgSeq);
 								msg.rspID=rspMsgID;
 								msg.status=97;
 							}
@@ -571,41 +578,41 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						msg.sendDate=new Date();
 				
 	                } catch (PDUException e) {
-	                    logger.error("Failed submit short message PDUException '" + message + "'", e);
-											sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
+	                    logger.error("Failed submit short message PDUException '" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+											sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+"Because incorrect format of PDU passed as a parameter or received from SMSC. Exception Message: "+e.getMessage());
 											reconnect(msg.MsgID);
 											msg.status=95;
 	                    //shutdown();
 	                } catch (ResponseTimeoutException e) {
-	                    logger.error("Failed submit short message  ResponseTimeoutException'" + message + "'", e);
-											sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
+	                    logger.error("Failed submit short message  ResponseTimeoutException'" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+											sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+"Because response is not received in timeout from SMSC. Exception Message: "+e.getMessage());
 											reconnect(msg.MsgID);
 											msg.status=95;
 	                    //shutdown();
 	                } catch (InvalidResponseException e) {
-	                    logger.error("Failed submit short message InvalidResponseException'" + message + "'", e);
-											sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
-	                    //shutdown();
+	                    logger.error("Failed submit short message InvalidResponseException'" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+											sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+"Because receive unexpected response from SMSC. Exception Message: "+e.getMessage());
+											msg.status=95;			
+						//shutdown();
 	                } catch (NegativeResponseException e) {
-	                    logger.error("Failed submit short message NegativeResponseException'" + message + "'", e);
-											sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
-	                    //shutdown();
+	                    logger.error("Failed submit short message NegativeResponseException'" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+											sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+"Because  receive an negative response from SMSC. Exception Message: "+e.getMessage());
+											msg.status=95;
+						//shutdown();
 	                } catch (IOException e) {
-	                    logger.error("Failed submit short message IOException '" + message + "'", e);
-											sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+"Because IO Problem. Exception Message: "+e.getMessage());
+	                    logger.error("Failed submit short message IOException '" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+											sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+"Because IO Problem. Exception Message: "+e.getMessage());
 											reconnect(msg.MsgID);
 											msg.status=95;
 	                    //shutdown();
 	                } catch (Exception e){
-										logger.error("Failed submit short message Exception'" + message + "'", e);
-										sendmail(errorAddInfo()+msg.MsgID+" send to gateway exception:"+e.getMessage());
+										logger.error("Failed submit short message Exception'" + message + "' of "+msg.MsgID+" seq = "+msg.MsgSeq, e);
+										sendmail(errorAddInfo()+". MsgID:"+msg.MsgID+" send to gateway exception:"+e.getMessage());
 										reconnect(msg.MsgID);
 										msg.status=95;
 					}finally{
 						System.out.println("The "+requestCounter.get()+"th msg sending end ! ");
 							requestCounter.decrementAndGet();	
-							
-						
 					}
 					
 					if(msg.status==95 ){
@@ -617,19 +624,20 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					Connection conn = null;
 					PreparedStatement ps = null;
 					PreparedStatement ps2 = null;
+					PreparedStatement ps3 = null;
 					try {
 						
 						conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
-						if(msg.isres){
-							String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
-							ps = conn.prepareStatement(sql);
-							System.out.println("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
-							ps.setString(1, msg.MsgID);
-							ps.setString(2, msg.sndTo);
-							ps.setString(3, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(msg.sendDate.getTime()+600000)));
-							ps.executeUpdate();	
-						}
-											
+						
+						//add on 20150108
+						String sql3="update msgitem set tries=?, status=?,rspid=? where msgid=? and seq=? ";
+						ps3=conn.prepareStatement(sql3);
+						ps3.setInt(1, msg.tries);
+						ps3.setInt(2, msg.status);
+						ps3.setString(3, msg.rspID);
+						ps3.setString(4, msg.MsgID);
+						ps3.setInt(5, msg.MsgSeq);
+						ps3.executeUpdate();			
 						
 						//If is long SMS message 
 						if("--".equals(msg.rspID)){
@@ -644,7 +652,16 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								ps2.executeUpdate();
 							}
 						}
-						
+
+						if(msg.isres){
+							String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
+							ps = conn.prepareStatement(sql);
+							System.out.println("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
+							ps.setString(1, msg.MsgID);
+							ps.setString(2, msg.sndTo);
+							ps.setString(3, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(msg.sendDate.getTime()+600000)));
+							ps.executeUpdate();	
+						}
 						
 					} catch (SQLException e) {
 						// TODO Auto-generated catch block
@@ -656,6 +673,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							if(conn!=null)conn.close();
 							if(ps!=null) ps.close();
 							if(ps2!=null)ps2.close();
+							if(ps3!=null)ps3.close();
 						} catch (SQLException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
@@ -685,7 +703,122 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
             }
         }
     }
+  
+    //20150129 decide cancel, not implemented
+/*    private class QueryOverdayFinally extends Thread {
+    	@Override
+        public void run() {
+    		logger.info("Starting OverDay QueryResult watcher...");
+    		Connection conn = null;
+    		String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(new Date().getTime()-1000*60*60*24));
+    		Statement ps = null ; 
+    		PreparedStatement ps2 = null ;
+    		ResultSet rs = null ;
+    		//撈取已停止查詢，狀態0，tries已達上限
+			String sql="select m.userid,i.rspid,i.msgid,seq,phoneno,msgbody,tries "
+					+ "from messages m, msgitem i where m.msgid=i.msgid  and status=0  and tries = "+RetryLimit+"and to_date(createtime,'yyyymmddhh24miss')>=to_date('"+str+"','yyyymmddhh24miss')";
+			String sql1="update msgitem set status=?,donetime=?,rspid=? where msgid=? and seq=? ";
+			//連線DB
+			try{
+				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+			}catch (SQLException e){
+				logger.info("QueryResultThread get Connection Exception..."+e.getMessage());
+				try{
+					ps.close();
+					conn.close();
+				}catch(SQLException e1){
+				}
+				sendmail(errorAddInfo()+"Because QueryOverdayFinally can't connect to DB,return. "+"Error Msg"+e.getMessage());
+				return;
+			}
+			String sndFrom =null;
+			String rspid = null;
+			Byte status = null;
+			String msgid = null;
+			String seq = null;
+			
+			while(!exit.get()){
+				
+				try {
+					ps = conn.createStatement();
+					rs = ps.executeQuery(sql);
+					ps2 = conn.prepareStatement(sql1);
+	
+					while(rs.next()){
+						sndFrom = rs.getString("userid");
+						rspid = rs.getString("rspid");
+						seq = rs.getString("seq");
+						
+						org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+						try {
+							long c = Long.parseLong(sndFrom);
+							ton = TypeOfNumber.INTERNATIONAL;
+						} catch (NumberFormatException e) {
+							System.out
+									.println("not send from number:" + sndFrom + ":");
+						}
+						
+						//一般簡訊
+						if(!"--".equals(rspid)){
+							//Query sms status from SMPP
+							QuerySmResult q4 = smppSession.queryShortMessage( rspid,ton,NumberingPlanIndicator.UNKNOWN,sndFrom);
+							status = q4.getMessageState().value();
+							System.out.println("due Day query:" + msgid + ",status:" + status + ",seq:"+seq);
+							
+							if(status!=null&&finalStatus.contains(status)){
+								ps2.setInt(1, status);
+								ps2.setString(2, q4.getFinalDate());
+								ps2.setShort(3, rspid);
+								
+								
+							}else{
+								
+							}
+							
+							
+						}else{
+							//長簡訊
+							
+							
+						}
+					}
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (PDUException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (ResponseTimeoutException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (InvalidResponseException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NegativeResponseException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+    			
+    		}
+    	}
+    }*/
+    
+    static Set<Integer> finalStatus = new HashSet<Integer>();
 
+    static void setfinalStatus(){
+		finalStatus.add(2);
+		finalStatus.add(3);
+		finalStatus.add(4);
+		finalStatus.add(5);
+		finalStatus.add(8);
+		finalStatus.add(9);
+    }
+    
+    
     private class QueryResultThread extends Thread {
         @Override
         public void run() {
@@ -717,19 +850,16 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					conn.close();
 				}catch(SQLException e1){
 				}
+				
+				sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
 				return;
 			}
 						
-			Set<Integer> finalStatus = new HashSet<Integer>();
-			finalStatus.add(2);
-			finalStatus.add(3);
-			finalStatus.add(4);
-			finalStatus.add(5);
-			finalStatus.add(8);
-			finalStatus.add(9);
+			
 			while (!exit.get()) {
 				try {
-					Thread.sleep(8000);
+					//20150129 modified 15000 to 60000
+					Thread.sleep(60000);
 				} catch (InterruptedException e) {
 				}
 
@@ -858,15 +988,12 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									} catch (NegativeResponseException e3) {
 										if (e3.getMessage().indexOf("67") == -1) {
 											logger.info("queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
-											sendmail("queryShortMessage exception:"
-													+ e3.getMessage());
+											sendmail("queryShortMessage exception:" + e3.getMessage());
 										}
 										reCheck=true;
 									} catch (Exception e2) {
 										logger.info("queryShortMessage "+ l.MsgID + "," + l.MsgSeq+ "," + l.part+ " Exception..."+ e2.getMessage());
-										sendmail("queryShortMessage exception:"
-												+ e2.getMessage());
-
+										sendmail("queryShortMessage exception:" + e2.getMessage());
 										reconnect(null);
 										reCheck=true;
 									}
@@ -915,24 +1042,25 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							}
 						}
 						try {
+							//if rspip is exists
 							if (id.rspID != null && !id.rspID.equals("")) {
 								if (id.fails < iFailLimit + 1) {
-									logger.info("done " + id.MsgID + "," + id.status + "...");
+									logger.info("done " + id.MsgID + "," + id.status+ "," + id.MsgSeq + "...");
 									ps.setInt(1, id.tries);
 									ps.setInt(2, id.status);
 								} else {
 									ps.setInt(1, id.tries + 1);
-									ps.setInt(2, 0);
+									//20150129 modifed status 0 to 3(overdue)
+									ps.setInt(2, 3);
 									logger.info("try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
 									synchronized (qryMsg) {
 										qryMsg.remove(id);
 										j--;
 									}
 								}
-								// 20141103 if sms has been sended over two day,
+								// 20141103 if sms has been sended over one day,
 								// no continue trace .
-								if (id.sendDate.before(new Date(new Date()
-										.getTime() - 1000 * 60 * 60 * 24 * 1))) {
+								if (id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
 									System.out.println(id.MsgID + "," + id.MsgSeq + " is over one day ...");
 									id.status = 96;
 									ps.setInt(1, id.tries);
@@ -945,6 +1073,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							} else {
 								ps.setInt(1, id.tries + 1);
 								ps.setInt(2, id.status);
+								
+								logger.error("msgid : "+id.MsgID+" haven't rspid!");
 							}
 							ps.setString(5, id.MsgID);
 							ps.setString(3, str);
@@ -955,7 +1085,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							ps.executeUpdate();
 
 							//20141222 add update data to response Log table in ten minute
-							if(id.isres && new Date().before(new Date(id.sendDate.getTime()+600000))){
+							if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
 								
 								ps2.setString(1, str);
 								if(id.status==0 || id.status==1 || id.status==97){
@@ -987,8 +1117,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	
 							
 						} catch (SQLException e) {
-							logger.info("QueryResultThread Exception..."
-									+ e.getMessage());
+							logger.info("QueryResultThread Exception..."+ e.getMessage());
 							e.printStackTrace();
 							try {
 								ps.close();
@@ -1020,7 +1149,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		
     static List<String> resUserID = new ArrayList<String>();
     public static void main(String[] args) throws Exception{
-        String host = DEFAULT_HOST;
+        
         String systemId = DEFAULT_SYSID;
         String password = DEFAULT_PASSWORD;
         String sourceAddr = "";
@@ -1038,21 +1167,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				}
         Class.forName("org.postgresql.Driver");
 				DriverManager.setLoginTimeout(10);
-        int port;
-        port = DEFAULT_PORT;
-        
-        long transactionTimer;
-        transactionTimer = DEFAULT_TRANSACTIONTIMER;
-        
-        int bulkSize;
-        bulkSize = DEFAULT_BULK_SIZE;
-        
-        int processorDegree;
-        processorDegree = DEFAULT_PROCESSOR_DEGREE;
-        
-        int maxOutstanding;
-        maxOutstanding = DEFAULT_MAX_OUTSTANDING;
-        
+ 
         Properties prop = new Properties();
         FileInputStream fis = new FileInputStream("StressClient.properties");
         prop.load(fis);
@@ -1063,6 +1178,25 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				SendPeriod=prop.getProperty("SendPeriod");
 				iSendPeriod=Integer.parseInt(SendPeriod);
 				AlertMailTo=prop.getProperty("AlertMailTo");
+				if(prop.getProperty("DEFAULT_HOST")!=null)
+				DEFAULT_HOST=prop.getProperty("DEFAULT_HOST");
+				
+		String host = DEFAULT_HOST;
+		 int port;
+	        port = DEFAULT_PORT;
+	        
+	        long transactionTimer;
+	        transactionTimer = DEFAULT_TRANSACTIONTIMER;
+	        
+	        int bulkSize;
+	        bulkSize = DEFAULT_BULK_SIZE;
+	        
+	        int processorDegree;
+	        processorDegree = DEFAULT_PROCESSOR_DEGREE;
+	        
+	        int maxOutstanding;
+	        maxOutstanding = DEFAULT_MAX_OUTSTANDING;
+	        
         String log4jPath =DEFAULT_LOG4J_PATH;
         PropertyConfigurator.configure(log4jPath);
         logger.info("Target server {}:{}", host, port);
@@ -1079,18 +1213,24 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
                 systemId, password, sourceAddr, destinationAddr,
                 transactionTimer, processorDegree, maxOutstanding);
         
+        //20150129 add
+        setfinalStatus();
         
         //20141222 add check need for response msg info
         String sql = "select USERID from smppuser where isres=1";
         Connection conn = null;
         conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper", "SmIpp3r");
-		Statement st = conn.createStatement();
+		if(conn!=null) logger.info("success");
+        Statement st = conn.createStatement();
 		ResultSet rs = st.executeQuery(sql);
 		logger.info("Query need send respose user id!:"+sql);
 		
 		while(rs.next()){
 			resUserID.add(rs.getString("USERID"));
 		}
+		st.close();
+		rs.close();
+		conn.close();
 
         stressClient.run();
     }
