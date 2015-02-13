@@ -69,7 +69,9 @@ public class StressClient implements Runnable {
     private static String destinationAddr;
 		private static String FailLimit;
 		private static String RetryLimit;
-		private static String SendPeriod,AlertMailTo;
+		private static String SendPeriod,AlertMailTo,QuertPeriod,QuertPastPeriod;
+		private static int iQuertPastPeriod;
+		private static int iQuertPeriod;
 		private static int iSendPeriod;
 		private static int iFailLimit;
     private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();
@@ -89,7 +91,7 @@ public class StressClient implements Runnable {
 			public int tries;
 			public int fails=0;
 			public Date sendDate=null;
-			public longmsgStatus[] rspIDs;
+			public List<longmsgStatus> rspIDs =new ArrayList<longmsgStatus>();
 			public boolean isres=false;
 		}
 		class longmsgStatus{
@@ -103,6 +105,9 @@ public class StressClient implements Runnable {
 		
 		private ArrayList<msgStatus> qryMsg= new ArrayList<msgStatus>();
 		private ArrayList<msgStatus> sndMsg= new ArrayList<msgStatus>();
+		
+		//20150210
+		private ArrayList<msgStatus> qryMsgPast= new ArrayList<msgStatus>();
 		
     public StressClient(int id, String host, int port, int bulkSize,
             String systemId, String password, String sourceAddr,
@@ -129,6 +134,132 @@ public class StressClient implements Runnable {
         exit.set(true);
     }
     
+    public void setQueryPast(){
+    	logger.info("setQueryPast...");
+    	Connection conn = null;
+    	PreparedStatement pst = null;
+		Statement st=null;
+		ResultSet rs = null;
+		ResultSet rs2 = null;
+		//µuÂ²°T
+		String sql = 
+				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,b.createtime "
+				+ "from msgitem a,messages b "
+				+ "where a.msgid=b.msgid and status=1 and rspid!='--' ";
+		
+		//ªøÂ²°T
+		String sql2 = 
+				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,b.createtime "
+				+ "from msgitem a,messages b "
+				+ "where a.msgid=b.msgid and status=1 and rspid='--' ";
+		
+		String sql3 =
+				"select msgid,seq,part,status,rspid "
+				+ "from longmsgitem "
+				+ "where msgid=? and seq=?";
+		
+		try {
+			conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+			
+			st = conn.createStatement();
+			
+			rs=st.executeQuery(sql);
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+			
+			while(rs.next()){
+				msgStatus mm=new msgStatus();
+				mm.sndFrom=rs.getString("userid");
+				mm.sndTo=rs.getString("phoneno");
+				mm.MsgBody=rs.getString("msgbody");
+				mm.MsgID=rs.getString("msgid");
+				mm.MsgSeq=rs.getInt("seq");
+				mm.rspID=rs.getString("rspID");
+				mm.status=rs.getInt("status");
+				mm.sendDate=sdf.parse(rs.getString("createtime"));
+					
+				if(resUserID.contains(mm.sndFrom)){
+					mm.isres=true;
+				}
+				
+				synchronized(qryMsgPast) {
+					qryMsgPast.add(mm);
+				}
+			}
+			
+			rs=st.executeQuery(sql2);
+			pst=conn.prepareStatement(sql3);
+			while(rs.next()){
+				msgStatus mm=new msgStatus();
+				mm.sndFrom=rs.getString("userid");
+				mm.sndTo=rs.getString("phoneno");
+				mm.MsgBody=rs.getString("msgbody");
+				mm.MsgID=rs.getString("msgid");
+				mm.MsgSeq=rs.getInt("seq");
+				mm.rspID=rs.getString("rspID");
+				mm.status=rs.getInt("status");
+				mm.sendDate=sdf.parse(rs.getString("createtime"));
+					
+				pst.setString(1, mm.MsgID);
+				pst.setInt(2, mm.MsgSeq);
+				
+				rs2 = pst.executeQuery();
+				
+				
+				while(rs2.next()){
+					longmsgStatus ls = new longmsgStatus();
+					ls.MsgID = mm.MsgID;
+					ls.MsgSeq = mm.MsgSeq;
+					ls.part = rs2.getInt("part");
+					ls.rspID = rs2.getString("rspid");
+					ls.status =rs2.getInt("status");
+					mm.rspIDs.add(ls);
+				}
+				
+				
+				if(resUserID.contains(mm.sndFrom)){
+					mm.isres=true;
+				}
+				
+				synchronized(qryMsgPast) {
+					qryMsgPast.add(mm);
+				}
+			}
+			
+			
+
+		} catch (SQLException e) {
+			logger.error("setPastqueryError SQLException",e);
+			sendmail(errorAddInfo()+"set Pastquery got SQLException"+"Error Msg"+e.getMessage());
+
+
+		} catch (ParseException e) {
+			logger.error("setPastqueryError ParseException",e);
+		}finally{
+			
+			try {
+				if(conn!=null){
+					conn.close();
+				}
+				if(st!=null){
+					st.close();
+				}
+				if(pst!=null){
+					pst.close();
+				}
+				if(rs!=null){
+					rs.close();
+				}
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		logger.info("setQueryPast   end...");
+		
+		
+    }
+    
     public void run() {
         try {
             smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,password, "cln", TypeOfNumber.UNKNOWN,NumberingPlanIndicator.UNKNOWN, null);
@@ -139,8 +270,12 @@ public class StressClient implements Runnable {
         }
         //new TrafficWatcherThread().start();
         Thread Qt=new QueryResultThread();
-        Qt.start();
         
+        Qt.start();
+        //20150211 add
+        Thread Qpt=new QueryPastThread();
+        setQueryPast();
+        Qpt.start();
  
 				//new QueryResultThread().start();
 				
@@ -157,10 +292,10 @@ public class StressClient implements Runnable {
 					sNum=0;
 				
 				int zk=0;
+				
+				
+				
 				while (!exit.get()) {
-					
-					
-					
 					
 					zk++;
 					/*if(zk==5)
@@ -185,8 +320,8 @@ public class StressClient implements Runnable {
 						csUpdate = conn.createStatement();
 						csUpdate.executeUpdate(sqlUpdate);
 						ps = conn.prepareStatement(sql);
-						rs = ps.executeQuery();
 						
+						rs = ps.executeQuery();
 						
 						while (rs.next()){
 							msgStatus mm=new msgStatus();
@@ -244,7 +379,7 @@ public class StressClient implements Runnable {
 							}
 						}
 					}
-					logger.info("Starting send " + bulkSize + " message done...");
+					//logger.info("Starting send " + bulkSize + " message done...");
 					try {
 							Thread.sleep(iSendPeriod);
 					} catch (InterruptedException e) {
@@ -291,7 +426,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				remain=1;
 			}
 			String [] rspIDs=new String[parts];
-			msg.rspIDs=new longmsgStatus[parts];
 			udh[4]=(byte)parts; //total number of parts
 			
 
@@ -328,7 +462,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				l.part=i+1;
 				l.status=97;
 				l.rspID=rspIDs[i];
-				msg.rspIDs[i]=l;
+				msg.rspIDs.add(l);
 				
 			}
 			if (remain==1){
@@ -348,7 +482,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				l.part=i+1;
 				l.status=97;
 				l.rspID=rspIDs[i];
-				msg.rspIDs[i]=l;
+				msg.rspIDs.add(l);
 				
 			}
 			//Thread.sleep(2000);
@@ -377,7 +511,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				remain=1;
 			}
 			String [] rspIDs=new String[parts];
-			msg.rspIDs=new longmsgStatus[parts];
 			udh[4]=(byte)parts; //total number of parts
 			
 
@@ -414,7 +547,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				l.part=i+1;
 				l.status=97;
 				l.rspID=rspIDs[i];
-				msg.rspIDs[i]=l;
+				msg.rspIDs.add(l);
 			}
 			if (remain==1){
 				udh[5]=(byte)(i+1);
@@ -433,7 +566,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				l.part=i+1;
 				l.status=97;
 				l.rspID=rspIDs[i];
-				msg.rspIDs[i]=l;
+				msg.rspIDs.add(l);
 			}
 			//Thread.sleep(2000);
 			//for (int j=0;j<i;j++){
@@ -534,7 +667,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                		throw new Exception("MsgBodyisNull!");	
 	                	
 						requestCounter.incrementAndGet();
-						System.out.println("The "+requestCounter.get()+"th msg Start send! ");
+						//System.out.println("The "+requestCounter.get()+"th msg Start send! ");
 						long startTime = System.currentTimeMillis();
 						if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
 							byte [] b=msg.MsgBody.getBytes("iso8859-1");
@@ -611,7 +744,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 										reconnect(msg.MsgID);
 										msg.status=95;
 					}finally{
-						System.out.println("The "+requestCounter.get()+"th msg sending end ! ");
+						//System.out.println("The "+requestCounter.get()+"th msg sending end ! ");
 							requestCounter.decrementAndGet();	
 					}
 					
@@ -631,6 +764,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						
 						//add on 20150108
 						String sql3="update msgitem set tries=?, status=?,rspid=? where msgid=? and seq=? ";
+						logger.info("update msgid="+msg.MsgID+",seq="+msg.MsgSeq+",status="+msg.status);
 						ps3=conn.prepareStatement(sql3);
 						ps3.setInt(1, msg.tries);
 						ps3.setInt(2, msg.status);
@@ -643,8 +777,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						if("--".equals(msg.rspID)){
 							String sql2="insert into longmsgitem (msgid,seq,part) Values(?,?,?) ";
 							ps2 = conn.prepareStatement(sql2);
-							for(int i=0;i<msg.rspIDs.length;i++){
-								longmsgStatus l= msg.rspIDs[i];
+							for(int i=0;i<msg.rspIDs.size();i++){
+								longmsgStatus l= msg.rspIDs.get(i);
 								ps2 = conn.prepareStatement(sql2);
 								ps2.setString(1, l.MsgID);
 								ps2.setInt(2, l.MsgSeq);
@@ -656,7 +790,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						if(msg.isres){
 							String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
 							ps = conn.prepareStatement(sql);
-							System.out.println("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
+							logger.info("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
 							ps.setString(1, msg.MsgID);
 							ps.setString(2, msg.sndTo);
 							ps.setString(3, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(msg.sendDate.getTime()+600000)));
@@ -664,7 +798,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						}
 						
 					} catch (SQLException e) {
-						// TODO Auto-generated catch block
+						logger.error("Occured error:"+e);
 						e.printStackTrace();
 					}finally{
 
@@ -859,10 +993,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			while (!exit.get()) {
 				try {
 					//20150129 modified 15000 to 60000
-					Thread.sleep(60000);
+					Thread.sleep(iQuertPeriod);
 				} catch (InterruptedException e) {
 				}
 
+				logger.info("Query Start...");
 				for (int j = 0; j < qryMsg.size(); j++) {
 					msgStatus id = null;
 					synchronized (qryMsg) {
@@ -884,13 +1019,12 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 										long c = Long.parseLong(id.sndFrom);
 										ton = TypeOfNumber.INTERNATIONAL;
 									} catch (NumberFormatException e) {
-										System.out
-												.println("not send from number:" + id.sndFrom + ":");
+										System.out.println("not send from number:" + id.sndFrom + ":");
 									}
 									//Query sms status from SMPP
 									QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
 									id.status = q4.getMessageState().value();
-									System.out.println("query:" + id.rspID + ",status:" + id.status);
+									//System.out.println("query:" + id.rspID + ",status:" + id.status);
 									
 									//if query result equal to zero,set status to 97(on route)
 									if (id.status == 0) {
@@ -931,7 +1065,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							}
 						} else if (id.rspID != null && id.rspID.equals("--")) {
 							// 20141106 proccess Long SMS
-							System.out.println("checking Long SMS rspids...");
+							//System.out.println("checking Long SMS rspids...");
 							// only enroute need be checked
 							if (id.status != 2) {
 								id.fails++;
@@ -949,15 +1083,15 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								boolean reCheck=false;
 								boolean haveUndilivered=false;
 								boolean reject=false;
-								System.out.println("for long SMS rspIDs length is "+id.rspIDs.length);
+								//System.out.println("for long SMS rspIDs length is "+id.rspIDs.length);
 
-								for(int i=0;i<id.rspIDs.length;i++){
-									longmsgStatus l= id.rspIDs[i];
+								for(int i=0;i<id.rspIDs.size();i++){
+									longmsgStatus l= id.rspIDs.get(i);
 									try {
 										if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
 											QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
 											l.status = q4.getMessageState().value();
-											System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+											//System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
 											
 											//20141222 add
 											if(finalStatus.contains(l.status)){
@@ -1045,7 +1179,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							//if rspip is exists
 							if (id.rspID != null && !id.rspID.equals("")) {
 								if (id.fails < iFailLimit + 1) {
-									logger.info("done " + id.MsgID + "," + id.status+ "," + id.MsgSeq + "...");
+									logger.info("msgId="+id.MsgID + ",status=" + id.status+ ",msgseq" + id.MsgSeq + "fails="+id.fails+"...");
 									ps.setInt(1, id.tries);
 									ps.setInt(2, id.status);
 								} else {
@@ -1060,7 +1194,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								}
 								// 20141103 if sms has been sended over one day,
 								// no continue trace .
-								if (id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
+								if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
 									System.out.println(id.MsgID + "," + id.MsgSeq + " is over one day ...");
 									id.status = 96;
 									ps.setInt(1, id.tries);
@@ -1103,7 +1237,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							}
 							
 							//if id id long SMSmessage
-							if(id.rspIDs!=null && id.rspIDs.length>0){
+							if(id.rspIDs!=null && id.rspIDs.size()>0){
 								for (longmsgStatus l : id.rspIDs) {
 									pst.setInt(1, l.status);
 									pst.setString(2, str);
@@ -1177,6 +1311,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				iFailLimit=Integer.parseInt(FailLimit);
 				SendPeriod=prop.getProperty("SendPeriod");
 				iSendPeriod=Integer.parseInt(SendPeriod);
+				QuertPeriod=prop.getProperty("QueryPeriod");
+				iQuertPeriod=Integer.parseInt(QuertPeriod);
+				QuertPastPeriod=prop.getProperty("QueryPastPeriod");
+				iQuertPastPeriod=Integer.parseInt(QuertPastPeriod);
 				AlertMailTo=prop.getProperty("AlertMailTo");
 				if(prop.getProperty("DEFAULT_HOST")!=null)
 				DEFAULT_HOST=prop.getProperty("DEFAULT_HOST");
@@ -1206,8 +1344,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         logger.info("Bulk size: {}", bulkSize);
         logger.info("Max outstanding: {}", maxOutstanding);
         logger.info("Processor degree: {}", processorDegree);
-				logger.info("Fail Limit: {}", FailLimit);
-				logger.info("clear Period: {}", iSendPeriod);
+		logger.info("Fail Limit: {}", FailLimit);
+		logger.info("send Period: {}", iSendPeriod);
+		logger.info("query Period: {}", iQuertPeriod);
+		logger.info("query Past Period: {}", iQuertPastPeriod);
         logger.info("AlertMailTo: {}", AlertMailTo);
         StressClient stressClient = new StressClient(0, host, port, bulkSize,
                 systemId, password, sourceAddr, destinationAddr,
@@ -1233,5 +1373,333 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		conn.close();
 
         stressClient.run();
+    }
+    //20150211 add
+    private class QueryPastThread extends Thread {
+        @Override
+        public void run() {
+            logger.info("Starting QueryPast watcher...");
+			Connection conn = null;
+			PreparedStatement ps=null;
+			PreparedStatement ps2=null;
+			PreparedStatement pst=null;
+			String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date());
+			String sql="update msgitem set tries=?, status=?,donetime=?,rspid=? where msgid=? and seq=? ";
+			String sql2="update longmsgitem set status=?,donetime=?,rspid=? where msgid=? and seq=? and part=? ";
+			
+			//20141222 add
+			String sql4 = "update responselog set acktime=?,status=?,updatetime=now() where msgid=? and phoneno=? ";
+			
+			
+			bulkSize=0;
+			try{
+				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+				ps = conn.prepareStatement(sql);
+				ps2 = conn.prepareStatement(sql4);
+				pst = conn.prepareStatement(sql2);
+			}catch (SQLException e){
+				logger.info("QueryPastThread get Connection Exception..."+e.getMessage());
+				try{
+					ps.close();
+					ps2.close();
+					pst.close();
+					conn.close();
+				}catch(SQLException e1){
+				}
+				
+				sendmail(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+				return;
+			}
+						
+			
+			while (qryMsgPast.size()>0) {
+				try {
+					//20150129 modified 15000 to 60000
+					Thread.sleep(iQuertPastPeriod);
+				} catch (InterruptedException e) {
+				}
+
+				logger.info("Query Past Start...");
+				for (int j = 0; j < qryMsgPast.size(); j++) {
+					msgStatus id = null;
+					synchronized (qryMsgPast) {
+						id = qryMsgPast.get(j);
+					}
+					if (id != null) {
+						str = new SimpleDateFormat("yyyyMMddHHmmss")
+								.format(new java.util.Date());
+						
+						//20141223 add process about status 95 send exception fail
+						if (id.rspID != null && !id.rspID.equals("")&& !id.rspID.equals("--")) {
+							// status is not DELIVERED
+							if (id.status != 2) {
+								try {
+									//search times add
+									id.fails++;
+									org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+									try {
+										long c = Long.parseLong(id.sndFrom);
+										ton = TypeOfNumber.INTERNATIONAL;
+									} catch (NumberFormatException e) {
+										//System.out.println("not send from number:" + id.sndFrom + ":");
+									}
+									//Query sms status from SMPP
+									QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+									id.status = q4.getMessageState().value();
+									//System.out.println("query:" + id.rspID + ",status:" + id.status);
+									
+									//if query result equal to zero,set status to 97(on route)
+									if (id.status == 0) {
+										id.status = 97;
+									}
+									// if (q4.getMessageState() ==
+									// MessageState.DELIVERED) {
+									// 20141103 2 to 9 is final status
+									// 20141112 7 is not final status,assume smpp center have not process yet
+									if (finalStatus.contains(id.status)) {
+										str = "20" + q4.getFinalDate();
+										str = str.substring(0, str.length() - 4);
+										System.out.println("Past : remove from check list:final date:"	+ str);
+										
+										synchronized (qryMsgPast) {
+											qryMsgPast.remove(id);
+											j--;
+										}
+										// yyyy MM dd HH mm ss
+										// 2014 05 20 14 24 04 532+
+										// assume : YYMMDDhhmmss
+									}
+								} catch (NegativeResponseException e3) {
+									if (e3.getMessage().indexOf("67") == -1) {
+										logger.info("Past : queryShortMessage "+ id.MsgID + "," + id.MsgSeq+ " Exception..."+ e3.getMessage());
+										sendmail("Past : queryShortMessage exception:"+ e3.getMessage());
+									}
+								} catch (Exception e2) {
+									logger.info("Past : queryShortMessage " + id.MsgID + "," + id.MsgSeq + " Exception..." + e2.getMessage());
+									sendmail("Past : queryShortMessage exception:" + e2.getMessage());
+									reconnect(null);
+								}
+							} else {
+								synchronized (qryMsgPast) {
+									qryMsgPast.remove(id);
+									j--;
+								}
+							}
+						} else if (id.rspID != null && id.rspID.equals("--")) {
+							// 20141106 proccess Long SMS
+							//System.out.println("checking Long SMS rspids...");
+							// only enroute need be checked
+							if (id.status != 2) {
+								id.fails++;
+
+								//proccess senfrom
+								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+								try {
+									long c = Long.parseLong(id.sndFrom);
+									ton = TypeOfNumber.INTERNATIONAL;
+								} catch (NumberFormatException e) {
+									//System.out.println("Past : not send from number:" + id.sndFrom + ":");
+								}
+
+								//query status
+								boolean reCheck=false;
+								boolean haveUndilivered=false;
+								boolean reject=false;
+								//System.out.println("for long SMS rspIDs length is "+id.rspIDs.length);
+
+								for(int i=0;i<id.rspIDs.size();i++){
+									longmsgStatus l= id.rspIDs.get(i);
+									try {
+										if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
+											QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+											l.status = q4.getMessageState().value();
+											//System.out.println("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+											
+											//20141222 add
+											if(finalStatus.contains(l.status)){
+												str = "20" + q4.getFinalDate();
+												str = str.substring(0, str.length() - 4);
+											}
+
+											if (l.status == 0) {
+												l.status = 97;
+											}
+											if(l.status!=2){
+												haveUndilivered=true;
+											}
+											if(l.status==0 || l.status==1 || l.status==7 || l.status==97){
+												reCheck=true;
+											}
+											if(l.status==8){
+												reject=true;
+											}		
+										}else{
+											logger.info("Past : No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
+											synchronized (qryMsgPast) {
+												qryMsgPast.remove(id);
+												j--;
+											}
+										}
+										
+									} catch (NegativeResponseException e3) {
+										if (e3.getMessage().indexOf("67") == -1) {
+											logger.info("Past : queryShortMessage "+ l.MsgID+ ","+ l.MsgSeq+ ","+ l.part+ " Exception..."+ e3.getMessage());
+											sendmail("Past : queryShortMessage exception:" + e3.getMessage());
+										}
+										reCheck=true;
+									} catch (Exception e2) {
+										logger.info("Past : queryShortMessage "+ l.MsgID + "," + l.MsgSeq+ "," + l.part+ " Exception..."+ e2.getMessage());
+										sendmail("Past : queryShortMessage exception:" + e2.getMessage());
+										reconnect(null);
+										reCheck=true;
+									}
+								}
+									
+								
+
+								
+								if(reCheck){
+									System.out.println("Past : need recheck!");
+									id.status = 1;
+								}else{
+									System.out.println("Past : need not recheck!");
+									synchronized (qryMsgPast) {
+										qryMsgPast.remove(id);
+										j--;
+									}
+									
+									if (!haveUndilivered) {
+										id.status = 2;
+									} else if (reject) {
+										id.status = 8;
+									} else {
+										id.status = 5;
+									}
+								}
+
+							} else {
+								synchronized (qryMsgPast) {
+									qryMsgPast.remove(id);
+									j--;
+								}
+							}
+
+							/*
+							 * id.status = 2; synchronized (qryMsgPast) {
+							 * qryMsgPast.remove(id); j--; }
+							 */
+							// TODO
+
+						} else {
+							logger.info("Past : No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
+							synchronized (qryMsgPast) {
+								qryMsgPast.remove(id);
+								j--;
+							}
+						}
+						try {
+							//if rspip is exists
+							if (id.rspID != null && !id.rspID.equals("")) {
+								if (id.fails < iFailLimit + 1) {
+									//logger.info("Past : msgId="+id.MsgID + ",status=" + id.status+ ",msgseq" + id.MsgSeq + "fails="+id.fails+"...");
+									ps.setInt(1, id.tries);
+									ps.setInt(2, id.status);
+								} else {
+									ps.setInt(1, id.tries + 1);
+									//20150129 modifed status 0 to 3(overdue)
+									ps.setInt(2, 3);
+									logger.info("Past : try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
+									synchronized (qryMsgPast) {
+										qryMsgPast.remove(id);
+										j--;
+									}
+								}
+								// 20141103 if sms has been sended over one day,
+								// no continue trace .
+								if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
+									System.out.println("Past : "+id.MsgID + "," + id.MsgSeq + " is over one day ...");
+									id.status = 96;
+									ps.setInt(1, id.tries);
+									ps.setInt(2, id.status);
+									synchronized (qryMsgPast) {
+										qryMsgPast.remove(id);
+										j--;
+									}
+								}
+							} else {
+								ps.setInt(1, id.tries + 1);
+								ps.setInt(2, id.status);
+								
+								logger.error("Past : msgid : "+id.MsgID+" haven't rspid!");
+							}
+							ps.setString(5, id.MsgID);
+							ps.setString(3, str);
+							ps.setString(4, id.rspID);
+							ps.setInt(6, id.MsgSeq);
+
+							//System.out.println("Past : update:" + id.MsgID + ",status:" + id.status + " with time:" + str);
+							ps.executeUpdate();
+
+							//20141222 add update data to response Log table in ten minute
+							if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
+								
+								ps2.setString(1, str);
+								if(id.status==0 || id.status==1 || id.status==97){
+									ps2.setString(2, "R");
+								}else if(id.status==2){
+									ps2.setString(2, "O");
+								}else{
+									ps2.setString(2, "F");
+								}
+								
+								ps2.setString(3, id.MsgID);
+								ps2.setString(4, id.sndTo);
+								
+								ps2.executeUpdate();
+							}
+							
+							//if id id long SMSmessage
+							if(id.rspIDs!=null && id.rspIDs.size()>0){
+								for (longmsgStatus l : id.rspIDs) {
+									pst.setInt(1, l.status);
+									pst.setString(2, str);
+									pst.setString(3, l.rspID);
+									pst.setString(4, l.MsgID);
+									pst.setInt(5, l.MsgSeq);
+									pst.setInt(6, l.part);
+									pst.executeUpdate();
+								}						
+							}
+	
+							
+						} catch (SQLException e) {
+							logger.info("QueryPastThread Exception..."+ e.getMessage());
+							e.printStackTrace();
+							try {
+								ps.close();
+								ps2.close();
+								pst.close();
+								conn.close();
+							} catch (SQLException e1) {
+							}
+							try {
+								conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper", "SmIpp3r");
+								ps = conn.prepareStatement(sql);
+								ps2 = conn.prepareStatement(sql4);
+								pst = conn.prepareStatement(sql2);
+							} catch (SQLException e1) {
+							}
+						}
+					}
+				}
+			}
+			try {
+				ps.close();
+				ps2.close();
+				pst.close();
+				conn.close();
+			} catch (SQLException e) {
+			}
+		}
     }
 }
