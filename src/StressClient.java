@@ -312,7 +312,7 @@ public class StressClient implements Runnable {
 					
 					//20141030 added! select with limited number
 					
-					String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries from messages m, msgitem i where m.msgid=i.msgid  and status=98  limit "+(THREADCOUNT-requestCounter.get());
+					String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries from messages m, msgitem i where m.msgid=i.msgid  and status=98 and tries<"+RetryLimit+" limit "+(THREADCOUNT-requestCounter.get());
 
 					System.out.println(sql);
 					bulkSize=0;
