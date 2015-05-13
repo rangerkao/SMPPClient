@@ -97,6 +97,8 @@ public class StressClient implements Runnable {
 		private static int iFailLimit;
     private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();
     
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+    
     private static  int reconnectLimit = 20;
     private static  int reconnectCount = 1;
     
@@ -135,7 +137,7 @@ public class StressClient implements Runnable {
             String systemId, String password, String sourceAddr,
             String destinationAddr, long transactionTimer,
             int pduProcessorDegree, int maxOutstanding) {
-        this.id = id;
+    	this.id = id;
         this.host = host;
         this.port = port;
         this.bulkSize = bulkSize;
@@ -166,13 +168,13 @@ public class StressClient implements Runnable {
 		ResultSet rs2 = null;
 		//short SMS
 		String sql = 
-				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,b.createtime "
+				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,a.sendtime "
 				+ "from msgitem a,messages b "
 				+ "where a.msgid=b.msgid and (status=1 or status=97) and rspid!='--' ";
 		
 		//long SMS
 		String sql2 = 
-				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,b.createtime "
+				"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,a.sendtime "
 				+ "from msgitem a,messages b "
 				+ "where a.msgid=b.msgid and (status=1 or status=97) and rspid='--' ";
 		
@@ -198,7 +200,7 @@ public class StressClient implements Runnable {
 				mm.MsgSeq=rs.getInt("seq");
 				mm.rspID=rs.getString("rspID");
 				mm.status=rs.getInt("status");
-				mm.sendDate=sdf.parse(rs.getString("createtime"));
+				mm.sendDate=(rs.getString("sendtime")==null ?new Date():sdf.parse(rs.getString("sendtime")));
 					
 				if(resUserID.contains(mm.sndFrom)){
 					mm.isres=true;
@@ -220,7 +222,7 @@ public class StressClient implements Runnable {
 				mm.MsgSeq=rs.getInt("seq");
 				mm.rspID=rs.getString("rspID");
 				mm.status=rs.getInt("status");
-				mm.sendDate=sdf.parse(rs.getString("createtime"));
+				mm.sendDate=(rs.getString("sendtime")==null ?new Date():sdf.parse(rs.getString("sendtime")));
 				logger.info(mm.MsgID+","+mm.MsgSeq+","+mm.status);
 				pst.setString(1, mm.MsgID);
 				pst.setInt(2, mm.MsgSeq);
@@ -277,7 +279,6 @@ public class StressClient implements Runnable {
 					rs.close();
 				}
 			} catch (SQLException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -324,13 +325,13 @@ public class StressClient implements Runnable {
 		if(sNum<0)
 			sNum=0;
 		
-		int zk=0;
+		//int zk=0;
 		
 		
 		
 		while (!exit.get()) {
 			
-			zk++;
+			//zk++;
 			/*if(zk==5)
 				smppSession.close();*/
 			String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date());
@@ -474,6 +475,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			int i;
 			org.jsmpp.bean.TypeOfNumber ton=TypeOfNumber.ALPHANUMERIC;
 			try {
+					@SuppressWarnings("unused")
 					long c = Long.parseLong(msg.sndFrom);
 					ton = TypeOfNumber.INTERNATIONAL;
 			}
@@ -559,6 +561,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			int i;
 			org.jsmpp.bean.TypeOfNumber ton=TypeOfNumber.ALPHANUMERIC;
 			try {
+					@SuppressWarnings("unused")
 					long c = Long.parseLong(msg.sndFrom);
 					ton = TypeOfNumber.INTERNATIONAL;
 			}
@@ -623,7 +626,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			try {
 				ip = InetAddress.getLocalHost().getHostAddress();
 			} catch (UnknownHostException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 			
@@ -696,10 +698,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
             public void run() {
             	msg.sendDate=new Date();
 
-				String message = msg.MsgBody;
+				//String message = msg.MsgBody;
 				String rspMsgID = "";
 				org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
 				try {
+					@SuppressWarnings("unused")
 					long c = Long.parseLong(msg.sndFrom);
 					ton = TypeOfNumber.INTERNATIONAL;
 				} catch (NumberFormatException e) {
@@ -820,6 +823,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						}
 					}
 					
+					
 					//20141222 add
 					//20141223 add
 					Connection conn = null;
@@ -831,40 +835,45 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
 						
 						//add on 20150108
-						String sql3="update msgitem set tries=?, status=?,rspid=? where msgid=? and seq=? ";
-						logger.info("update msgid="+msg.MsgID+",seq="+msg.MsgSeq+",status="+msg.status);
+						String sql3="update msgitem set tries=?, status=?,rspid=?,sendtime=? where msgid=? and seq=? ";
+						logger.info("update msgid="+msg.MsgID+",seq="+msg.MsgSeq+",status="+msg.status+",sendtime="+msg.sendDate.toString());
 						ps3=conn.prepareStatement(sql3);
 						ps3.setInt(1, msg.tries);
 						ps3.setInt(2, msg.status);
 						ps3.setString(3, msg.rspID);
-						ps3.setString(4, msg.MsgID);
-						ps3.setInt(5, msg.MsgSeq);
+						//20150513 add
+						ps3.setString(4, sdf.format(msg.sendDate));
+						ps3.setString(5, msg.MsgID);
+						ps3.setInt(6, msg.MsgSeq);
 						ps3.executeUpdate();			
 						
-						//If is long SMS message 
-						if("--".equals(msg.rspID)){
-							String sql2="insert into longmsgitem (msgid,seq,part) Values(?,?,?) ";
-							ps2 = conn.prepareStatement(sql2);
-							for(int i=0;i<msg.rspIDs.size();i++){
-								longmsgStatus l= msg.rspIDs.get(i);
+						
+						//20150513 add
+						if(95!=msg.status){
+							//If is long SMS message 
+							if("--".equals(msg.rspID)){
+								String sql2="insert into longmsgitem (msgid,seq,part) Values(?,?,?) ";
 								ps2 = conn.prepareStatement(sql2);
-								ps2.setString(1, l.MsgID);
-								ps2.setInt(2, l.MsgSeq);
-								ps2.setInt(3, l.part);
-								ps2.executeUpdate();
+								for(int i=0;i<msg.rspIDs.size();i++){
+									longmsgStatus l= msg.rspIDs.get(i);
+									ps2 = conn.prepareStatement(sql2);
+									ps2.setString(1, l.MsgID);
+									ps2.setInt(2, l.MsgSeq);
+									ps2.setInt(3, l.part);
+									ps2.executeUpdate();
+								}
+							}
+
+							if(msg.isres){
+								String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
+								ps = conn.prepareStatement(sql);
+								logger.info("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
+								ps.setString(1, msg.MsgID);
+								ps.setString(2, msg.sndTo);
+								ps.setString(3, sdf.format(new Date(msg.sendDate.getTime()+600000)));
+								ps.executeUpdate();	
 							}
 						}
-
-						if(msg.isres){
-							String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
-							ps = conn.prepareStatement(sql);
-							logger.info("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
-							ps.setString(1, msg.MsgID);
-							ps.setString(2, msg.sndTo);
-							ps.setString(3, new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(msg.sendDate.getTime()+600000)));
-							ps.executeUpdate();	
-						}
-						
 					} catch (SQLException e) {
 						logger.error("Occured error:"+e);
 						e.printStackTrace();
@@ -877,7 +886,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							if(ps2!=null)ps2.close();
 							if(ps3!=null)ps3.close();
 						} catch (SQLException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					}
@@ -906,108 +914,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         }
     }
   
-    //20150129 decide cancel, not implemented
-/*    private class QueryOverdayFinally extends Thread {
-    	@Override
-        public void run() {
-    		logger.info("Starting OverDay QueryResult watcher...");
-    		Connection conn = null;
-    		String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(new Date().getTime()-1000*60*60*24));
-    		Statement ps = null ; 
-    		PreparedStatement ps2 = null ;
-    		ResultSet rs = null ;
-    		//select stopded query item ,status is 0,tries reached limit
-			String sql="select m.userid,i.rspid,i.msgid,seq,phoneno,msgbody,tries "
-					+ "from messages m, msgitem i where m.msgid=i.msgid  and status=0  and tries = "+RetryLimit+"and to_date(createtime,'yyyymmddhh24miss')>=to_date('"+str+"','yyyymmddhh24miss')";
-			String sql1="update msgitem set status=?,donetime=?,rspid=? where msgid=? and seq=? ";
-			//connect DB
-			try{
-				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
-			}catch (SQLException e){
-				logger.error("QueryResultThread get Connection Exception..."+e.getMessage());
-				try{
-					ps.close();
-					conn.close();
-				}catch(SQLException e1){
-				}
-				sendmail(errorAddInfo()+"Because QueryOverdayFinally can't connect to DB,return. "+"Error Msg"+e.getMessage());
-				return;
-			}
-			String sndFrom =null;
-			String rspid = null;
-			Byte status = null;
-			String msgid = null;
-			String seq = null;
-			
-			while(!exit.get()){
-				
-				try {
-					ps = conn.createStatement();
-					rs = ps.executeQuery(sql);
-					ps2 = conn.prepareStatement(sql1);
-	
-					while(rs.next()){
-						sndFrom = rs.getString("userid");
-						rspid = rs.getString("rspid");
-						seq = rs.getString("seq");
-						
-						org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
-						try {
-							long c = Long.parseLong(sndFrom);
-							ton = TypeOfNumber.INTERNATIONAL;
-						} catch (NumberFormatException e) {
-							System.out
-									.println("not send from number:" + sndFrom + ":");
-						}
-						
-						//normal SMS
-						if(!"--".equals(rspid)){
-							//Query sms status from SMPP
-							QuerySmResult q4 = smppSession.queryShortMessage( rspid,ton,NumberingPlanIndicator.UNKNOWN,sndFrom);
-							status = q4.getMessageState().value();
-							logger.info("due Day query:" + msgid + ",status:" + status + ",seq:"+seq);
-							
-							if(status!=null&&finalStatus.contains(status)){
-								ps2.setInt(1, status);
-								ps2.setString(2, q4.getFinalDate());
-								ps2.setShort(3, rspid);
-								
-								
-							}else{
-								
-							}
-							
-							
-						}else{
-							//Long SMS
-							
-							
-						}
-					}
-				} catch (SQLException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (PDUException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (ResponseTimeoutException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (InvalidResponseException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (NegativeResponseException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
-    			
-    		}
-    	}
-    }*/
     
     static Set<Integer> finalStatus = new HashSet<Integer>();
 
@@ -1050,9 +956,12 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					ErrorLog.add(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
 				}
 				try{
-					ps.close();
-					ps2.close();
-					pst.close();
+					if(ps!=null)
+						ps.close();
+					if(ps2!=null)
+						ps2.close();
+					if(pst!=null)
+						pst.close();
 					conn.close();
 				}catch(SQLException e1){
 				}
@@ -1086,6 +995,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									id.fails++;
 									org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
 									try {
+										@SuppressWarnings("unused")
 										long c = Long.parseLong(id.sndFrom);
 										ton = TypeOfNumber.INTERNATIONAL;
 									} catch (NumberFormatException e) {
@@ -1149,6 +1059,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								//proccess senfrom
 								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
 								try {
+									@SuppressWarnings("unused")
 									long c = Long.parseLong(id.sndFrom);
 									ton = TypeOfNumber.INTERNATIONAL;
 								} catch (NumberFormatException e) {
@@ -1243,12 +1154,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									j--;
 								}
 							}
-
-							/*
-							 * id.status = 2; synchronized (qryMsg) {
-							 * qryMsg.remove(id); j--; }
-							 */
-							// TODO
 
 						} else {
 							logger.info("No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
@@ -1472,7 +1377,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					//waiting 10 minute for every round
 					Thread.sleep(600000);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				if(ErrorLog.size()>0){
@@ -1724,13 +1628,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								qryMsgPast.remove(id);
 							}
 						}
-
-						/*
-						 * id.status = 2; synchronized (qryMsgPast) {
-						 * qryMsgPast.remove(id); j--; }
-						 */
-						// TODO
-
 					} else {
 						logger.info("Past : No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
 						synchronized (qryMsgPast) {
