@@ -314,27 +314,26 @@ public class StressClient implements Runnable {
 		//new QueryResultThread().start();
 		
 		Connection conn = null;
-		PreparedStatement ps=null;
-		Statement  csUpdate=null;
+		Statement st=null;
+		Statement csUpdate=null;
+		Statement csGroup=null;
 		ResultSet rs = null;
-		
-		
-		
-		//20141030 if THREADCOUNT is less than 10
-		int sNum=THREADCOUNT-10;
-		if(sNum<0)
-			sNum=0;
-		
-		//int zk=0;
-		
-		
-		
+		ResultSet rs2 = null;
+
 		while (!exit.get()) {
+			//20141030 if THREADCOUNT is less than 10
+			int sNum=THREADCOUNT-10;
+			if(sNum<0)
+				sNum=0;
+			
+			//int zk=0;
+			
 			
 			//zk++;
 			/*if(zk==5)
 				smppSession.close();*/
-			String str = new SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date());
+			//20150518 mod not to ss
+			String str = new SimpleDateFormat("yyyyMMddHHmm").format(new java.util.Date());
 			//20141103 add status 95 (sended result fail)
 			//String sqlUpdate="update msgitem set status=98 where (schedule<='"+str+"' or schedule='0') and (status=0 or status=99 or status=95) and tries<"+RetryLimit;
 			//20150129 modified
@@ -344,9 +343,135 @@ public class StressClient implements Runnable {
 			
 			//20141030 added! select with limited number
 			//20150318 modified order by tries , send from less tries
-			String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries from messages m, msgitem i where m.msgid=i.msgid  and status=98 and tries<"+RetryLimit+" order by tries limit "+(THREADCOUNT-requestCounter.get());
+			//20150518 mod
+			/*String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries from messages m, msgitem i where m.msgid=i.msgid  and status=98 and tries<"+RetryLimit+" order by tries limit "+(THREADCOUNT-requestCounter.get());*/
+
 			
-			System.out.println(sql);
+			String sqlGroup=""
+					+ "select c.userid,c.schedule,count(1) from ( select a.msgid,a.seq,b.userid,(case when a.schedule='0' then 0 else 1 end ) schedule  "
+					+ "from msgitem a,messages b  where a.msgid=b.msgid and a.status=98 and tries<"+RetryLimit+" ) c group by c.userid,c.schedule order by c.userid,c.schedule ";
+
+			
+			List<Map<String,String>> grouplist = new ArrayList<Map<String,String>>();
+			
+			
+			try {
+				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+				
+				grouplist.clear();
+				sndMsg.clear();
+				bulkSize=0;
+				
+				//update needed to 98
+				csUpdate = conn.createStatement();
+				csUpdate.executeUpdate(sqlUpdate);
+				//logger.info(sqlUpdate);
+				//get group
+				csGroup = conn.createStatement();
+				//logger.info(sqlGroup);
+				rs = csGroup.executeQuery(sqlGroup);
+				
+
+
+				while(rs.next()){
+					Map<String,String> map = new HashMap<String,String>();
+					String userid = rs.getString("userid");
+					String schedule = rs.getString("schedule");
+					//logger.info("userid="+userid+",schedule="+schedule);
+					map.put("userid", userid);
+					map.put("schedule", schedule);
+					grouplist.add(map);
+				}
+				
+				//select
+				
+				for(Map<String,String> map:grouplist){
+					String userid = map.get("userid");
+					String schedule = map.get("schedule");
+					logger.info("userid="+userid+",schedule="+schedule);
+					st = conn.createStatement();
+					String sql="select m.userid,i.msgid,seq,phoneno,msgbody,tries "
+							+ "from messages m, msgitem i "
+							+ "where m.msgid=i.msgid  and status=98 and tries<"+RetryLimit+" "
+							+ "and m.userid='"+userid+"' and "+("0".equals(schedule)?"i.schedule='0' ":"i.schedule!='0' ")
+							+ "order by tries limit "+(THREADCOUNT-requestCounter.get());
+					
+					//logger.info(sql);
+					rs2 = st.executeQuery(sql);
+					
+					while (rs2.next()){
+						msgStatus mm=new msgStatus();
+						mm.sndFrom=rs2.getString("userid");
+						mm.sndTo=rs2.getString("phoneno");
+						mm.MsgBody=rs2.getString("msgbody");
+						mm.MsgID=rs2.getString("msgid");
+						mm.MsgSeq=rs2.getInt("seq");
+						mm.rspID="";
+						mm.status=97;
+						mm.tries=rs2.getInt("tries");
+							
+						if(resUserID.contains(mm.sndFrom)){
+							mm.isres=true;
+						}
+						
+						synchronized(sndMsg) {
+							sndMsg.add(mm);
+						}
+					}
+					
+					bulkSize=sndMsg.size();
+					
+					for (int i = 0; i < bulkSize && !exit.get(); i++) {
+						msgStatus tmm=null;
+						synchronized(sndMsg) {
+							tmm=sndMsg.get(i);
+						}
+						if (tmm!=null){
+							execService.execute(newSendTask(tmm));
+							synchronized(qryMsg) {
+								qryMsg.add(tmm);
+							}
+						}
+						
+						while(requestCounter.get()>sNum){
+							while (requestCounter.get()>=THREADCOUNT){
+								logger.info("thread count limit reached.....");
+								try {
+										Thread.sleep(1000);
+								} catch (InterruptedException e) {
+								}
+							}
+						}
+					}
+					try {
+						Thread.sleep(iSendPeriod);
+					} catch (InterruptedException e) {
+					}
+					logger.info("Sended " + bulkSize + " message...");
+				}
+				if(bulkSize==0){
+					try {
+						Thread.sleep(iSendPeriod);
+					} catch (InterruptedException e) {
+					}
+					logger.info("Sended " + bulkSize + " message...");
+				}
+			} catch (SQLException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}finally{
+				try{
+					rs.close();
+					rs2.close();
+					st.close();
+					csUpdate.close();
+					csGroup.close();
+					conn.close();
+				}catch(Exception e){
+				}
+			}
+			
+			/*System.out.println(sql);
 			bulkSize=0;
 			try{
 				sndMsg.clear();
@@ -409,7 +534,7 @@ public class StressClient implements Runnable {
 				}
 				
 				while(requestCounter.get()>sNum){
-				/*while (requestCounter.get()>=THREADCOUNT){*/
+				while (requestCounter.get()>=THREADCOUNT){
 					logger.info("thread count limit reached.....");
 					try {
 							Thread.sleep(1000);
@@ -421,7 +546,7 @@ public class StressClient implements Runnable {
 			try {
 					Thread.sleep(iSendPeriod);
 			} catch (InterruptedException e) {
-			}
+			}*/
         }
         logger.info("Send Thread Finished");
         smppSession.unbindAndClose();
@@ -669,7 +794,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			        } catch (InterruptedException e) {
 			        	logger.error(reconnectCount+"th retry Bound is Failed reinitialize connection or bind", e);
 					}
-					if(reconnectCount<=reconnectLimit){
+					if(reconnectCount<reconnectLimit){
 						reconnectCount++;
 					}else{
 						break;
@@ -1041,7 +1166,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									synchronized(ErrorLog){
 										ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
 									}
-									reconnect(null);
+									reconnect(id.MsgID);
 								}
 							} else {
 								synchronized (qryMsg) {
@@ -1121,7 +1246,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 										synchronized(ErrorLog){
 											ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
 										}
-										reconnect(null);
+										reconnect(id.MsgID);
 										reCheck=true;
 									}
 								}
@@ -1166,7 +1291,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							//if rspip is exists
 							if (id.rspID != null && !id.rspID.equals("")) {
 								if (id.fails < iFailLimit + 1) {
-									logger.info("msgId="+id.MsgID + ",status=" + id.status+ ",msgseq" + id.MsgSeq + "fails="+id.fails+"...");
+									logger.info("msgId="+id.MsgID + ",status=" + id.status+ ",msgseq=" + id.MsgSeq + ",fails="+id.fails+"...");
 									ps.setInt(1, id.tries);
 									ps.setInt(2, id.status);
 									//20150312 change when no rspid,remove msg from query at after sending
@@ -1517,7 +1642,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								synchronized(ErrorLog){
 									ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 								}
-								reconnect(null);
+								reconnect(id.MsgID);
 							}
 						} else {
 							synchronized (qryMsgPast) {
@@ -1594,7 +1719,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									synchronized(ErrorLog){
 										ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 									}
-									reconnect(null);
+									reconnect(id.MsgID);
 									reCheck=true;
 								}
 							}
