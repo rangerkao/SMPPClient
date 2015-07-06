@@ -759,7 +759,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			String [] cmd=new String[3];
 			cmd[0]="/bin/bash";
 			cmd[1]="-c";
-			cmd[2]= "/bin/echo \""+msg+"\" | /bin/mail -s \"SMPP System alert\" "+AlertMailTo ;
+			cmd[2]= "/bin/echo \""+msg+"\" | /bin/mail -s \"SMPP System alert\" -r STRESS_CLIENT_ALERT_MAIL "+AlertMailTo+"." ; ;
 
 			try{
 				Process p = Runtime.getRuntime().exec (cmd);
