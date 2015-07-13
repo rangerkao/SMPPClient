@@ -130,6 +130,7 @@ public class ResponseBatch {
 					if(!"200".equals(r.sendResult))
 						throw new IOException("Post not success Error");
 				} catch (IOException e) {
+					//XXX
 					logger.error("post "+url+"?"+param+" error at "+new Date(),e);
 					sendmail("post "+url+"?"+param+" error at "+new Date()+" . ErrorMessage:"+e.getMessage());
 					if(r.sendResult==null)
@@ -200,7 +201,14 @@ public class ResponseBatch {
 		return responseCode;
 	}
 	
+	
 	void sendmail(String msg){
+		synchronized(StressClient.getErrorLog()){
+			StressClient.getErrorLog().add(msg);
+		}
+	}
+	
+	/*void sendmail(String msg){
 		String ip ="";
 		try {
 			ip = InetAddress.getLocalHost().getHostAddress();
@@ -223,6 +231,6 @@ public class ResponseBatch {
 		}catch (Exception e){
 			System.out.println("send mail fail:"+msg);
 		}
-	}
+	}*/
 
 }

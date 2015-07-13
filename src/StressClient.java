@@ -128,7 +128,7 @@ public class StressClient implements Runnable {
 		
 		private ArrayList<msgStatus> qryMsg= new ArrayList<msgStatus>();
 		private ArrayList<msgStatus> sndMsg= new ArrayList<msgStatus>();
-		private ArrayList<String> ErrorLog= new ArrayList<String>();
+		private static ArrayList<String> ErrorLog= new ArrayList<String>();
 		
 		//20150210
 		private ArrayList<msgStatus> qryMsgPast= new ArrayList<msgStatus>();
@@ -256,8 +256,8 @@ public class StressClient implements Runnable {
 		} catch (SQLException e) {
 			logger.error("setPastqueryError SQLException",e);
 			//sendmail(errorAddInfo()+"set Pastquery got SQLException"+"Error Msg"+e.getMessage());
-			synchronized(ErrorLog){
-				ErrorLog.add(errorAddInfo()+"set Pastquery got SQLException"+"Error Msg"+e.getMessage());
+			synchronized(getErrorLog()){
+				getErrorLog().add(errorAddInfo()+"set Pastquery got SQLException"+"Error Msg"+e.getMessage());
 			}
 
 
@@ -806,8 +806,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					if(msgID!=null){
 						logger.error(errorAddInfo()+" The "+msgID+" Msg cannot send!");
 						//sendmail(errorAddInfo()+" The "+msgID+" Msg cannot send!");
-						synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+" The "+msgID+" Msg cannot send!");
+						synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+" The "+msgID+" Msg cannot send!");
 						}
 					}
 				}
@@ -887,8 +887,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                } catch (PDUException e) {
 	                    logger.error("Caused by PDUException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by PDUException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by PDUException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by PDUException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}					
 	                    reconnect(msg.MsgID);
 	                    msg.status=95;
@@ -896,8 +896,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                } catch (ResponseTimeoutException e) {
 	                	logger.error("Caused by ResponseTimeoutException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by ResponseTimeoutException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by ResponseTimeoutException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by ResponseTimeoutException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 	                    }							
 	                    reconnect(msg.MsgID);
 						msg.status=95;
@@ -905,24 +905,24 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                } catch (InvalidResponseException e) {
 	                	logger.error("Caused by InvalidResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by InvalidResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by InvalidResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by InvalidResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
 	                    msg.status=95;			
 						//shutdown();
 	                } catch (NegativeResponseException e) {
 	                	logger.error("Caused by NegativeResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by NegativeResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by NegativeResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by NegativeResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
 	                    msg.status=95;
 						//shutdown();
 	                } catch (IOException e) {
 	                	logger.error("Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
 	                    reconnect(msg.MsgID);
 						msg.status=95;
@@ -930,8 +930,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                } catch (Exception e){
 	                	logger.error("Caused by Exception , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
 	                    //sendmail(errorAddInfo()+"Caused by Exception , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
-	                    synchronized(ErrorLog){
-							ErrorLog.add(errorAddInfo()+"Caused by Exception , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
+	                    synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
 	                    reconnect(msg.MsgID);
 						msg.status=95;
@@ -1077,8 +1077,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			}catch (SQLException e){
 				logger.error("QueryResultThread get Connection Exception..."+e.getMessage());
 				//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
-				synchronized(ErrorLog){
-					ErrorLog.add(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+				synchronized(getErrorLog()){
+					getErrorLog().add(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
 				}
 				try{
 					if(ps!=null)
@@ -1156,15 +1156,15 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									if (e3.getMessage().indexOf("67") == -1) {
 					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										synchronized(ErrorLog){
-											ErrorLog.add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+										synchronized(getErrorLog()){
+											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 										}
 									}
 								} catch (Exception e2) {
 				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
-									synchronized(ErrorLog){
-										ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
+									synchronized(getErrorLog()){
+										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
 									}
 									reconnect(id.MsgID);
 								}
@@ -1235,16 +1235,16 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 										if (e3.getMessage().indexOf("67") == -1) {
 						                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 											//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-											synchronized(ErrorLog){
-												ErrorLog.add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+											synchronized(getErrorLog()){
+												getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 											}
 										}
 										reCheck=true;
 									} catch (Exception e2) {
 					                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 										//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
-										synchronized(ErrorLog){
-											ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
+										synchronized(getErrorLog()){
+											getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
 										}
 										reconnect(id.MsgID);
 										reCheck=true;
@@ -1366,8 +1366,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						} catch (SQLException e) {
 							logger.error("QueryResultThread got SQLException...",e);
 							//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-							synchronized(ErrorLog){
-								ErrorLog.add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+							synchronized(getErrorLog()){
+								getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
 							}
 							try {
 								ps.close();
@@ -1504,13 +1504,13 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-				if(ErrorLog.size()>0){
+				if(getErrorLog().size()>0){
 					String msg = "";
-					synchronized(ErrorLog){
-						for(String s:ErrorLog){
+					synchronized(getErrorLog()){
+						for(String s:getErrorLog()){
 							msg+=s+"\n\n";
 						}
-						ErrorLog.clear();
+						getErrorLog().clear();
 					}
 					sendmail(msg);
 				}
@@ -1578,8 +1578,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     				}
     				
     				//sendmail(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
-    				synchronized(ErrorLog){
-						ErrorLog.add(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+    				synchronized(getErrorLog()){
+						getErrorLog().add(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
 					}
     				return;
     			}
@@ -1632,15 +1632,15 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								if (e3.getMessage().indexOf("67") == -1) {
 				                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 									//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-									synchronized(ErrorLog){
-										ErrorLog.add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+									synchronized(getErrorLog()){
+										getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 									}
 								}
 							} catch (Exception e2) {
 			                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 								//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-								synchronized(ErrorLog){
-									ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+								synchronized(getErrorLog()){
+									getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 								}
 								reconnect(id.MsgID);
 							}
@@ -1708,16 +1708,16 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									if (e3.getMessage().indexOf("67") == -1) {
 					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										synchronized(ErrorLog){
-											ErrorLog.add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+										synchronized(getErrorLog()){
+											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 										}
 									}
 									reCheck=true;
 								} catch (Exception e2) {
 				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-									synchronized(ErrorLog){
-										ErrorLog.add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+									synchronized(getErrorLog()){
+										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 									}
 									reconnect(id.MsgID);
 									reCheck=true;
@@ -1835,8 +1835,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					} catch (SQLException e) {
 						logger.error("QueryResultThread got SQLException...",e);
 						//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-						synchronized(ErrorLog){
-							ErrorLog.add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+						synchronized(getErrorLog()){
+							getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
 						}	
 					}finally{
 						try {
@@ -1851,5 +1851,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			
             }
         };
+	}
+	public static ArrayList<String> getErrorLog() {
+		return ErrorLog;
+	}
+	public static void setErrorLog(ArrayList<String> errorLog) {
+		ErrorLog = errorLog;
 	}
 }
