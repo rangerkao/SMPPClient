@@ -917,6 +917,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							getErrorLog().add(errorAddInfo()+"Caused by NegativeResponseException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
 	                    msg.status=95;
+	                    
+	                    if(e.getMessage().indexOf("0b") != -1){
+	                    	msg.status=94;
+	                    }
+	                    
 						//shutdown();
 	                } catch (IOException e) {
 	                	logger.error("Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+")", e);
