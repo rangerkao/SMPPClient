@@ -918,7 +918,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						}							
 	                    msg.status=95;
 	                    
-	                    if(e.getMessage().indexOf("0b") != -1){
+	                    if(e.getMessage().toLowerCase().indexOf("0b") != -1){
 	                    	msg.status=94;
 	                    }
 	                    
@@ -996,6 +996,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 
 							if(msg.isres){
 								String sql ="insert into responselog (msgid,phoneno,sendtime,createtime) values(?,?,?,now()) ";
+								//20150715 add
+								if(94==msg.status)
+									sql="insert into responselog (msgid,phoneno,sendtime,createtime,status) values(?,?,?,now(),'F') ";
+								
 								ps = conn.prepareStatement(sql);
 								logger.info("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
 								ps.setString(1, msg.MsgID);
@@ -1312,7 +1316,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								}*/
 								// 20141103 if sms has been sended over one day,
 								// no continue trace .
-								if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
+								if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - (1000 * 60 * 60 * 24 * 1 + 1000 * 60 * 1)))) {
 									logger.info(id.MsgID + "," + id.MsgSeq + " is over one day ...");
 									id.status = 96;
 									ps.setInt(1, id.tries);
