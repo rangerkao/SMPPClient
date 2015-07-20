@@ -91,7 +91,6 @@ public class ResponseBatch {
 	private void proccess(){
 		Connection conn = null;
 		Statement st = null;
-		Statement st2 = null;
 		ResultSet rs = null;
 		
 		List<res> resList = new ArrayList<res>();

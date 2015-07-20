@@ -461,13 +461,20 @@ public class StressClient implements Runnable {
 				e1.printStackTrace();
 			}finally{
 				try{
-					rs.close();
-					rs2.close();
-					st.close();
-					csUpdate.close();
-					csGroup.close();
-					conn.close();
+					if(rs!=null)
+						rs.close();
+					if(rs2!=null)
+						rs2.close();
+					if(st!=null)
+						st.close();
+					if(csUpdate!=null)
+						csUpdate.close();
+					if(csGroup!=null)
+						csGroup.close();
+					if(conn!=null)
+						conn.close();
 				}catch(Exception e){
+				
 				}
 			}
 			
@@ -1078,7 +1085,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			
 			
 			bulkSize=0;
-			try{
+			/*try{
 				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
 				ps = conn.prepareStatement(sql);
 				ps2 = conn.prepareStatement(sql4);
@@ -1100,7 +1107,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				}catch(SQLException e1){
 				}
 				return;
-			}
+			}*/
 						
 			
 			while (!exit.get()) {
@@ -1109,137 +1116,68 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					Thread.sleep(iQuertPeriod);
 				} catch (InterruptedException e) {
 				}
+				
+				
+				
+				try {
+					conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+					ps = conn.prepareStatement(sql);
+					ps2 = conn.prepareStatement(sql4);
+					pst = conn.prepareStatement(sql2);
+					
+					
+					logger.info("Query Start...");
+					for (int j = 0; j < qryMsg.size(); j++) {
 
-				logger.info("Query Start...");
-				for (int j = 0; j < qryMsg.size(); j++) {
-					msgStatus id = null;
-					synchronized (qryMsg) {
-						id = qryMsg.get(j);
-					}
-					if (id != null) {
-						str = new SimpleDateFormat("yyyyMMddHHmmss")
-								.format(new java.util.Date());
-						
-						//20141223 add process about status 95 send exception fail
-						if (id.rspID != null && !id.rspID.equals("")&& !id.rspID.equals("--")) {
-							// status is not DELIVERED
-							if (id.status != 2) {
-								try {
-									//search times add
-									id.fails++;
-									org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+						msgStatus id = null;
+						synchronized (qryMsg) {
+							id = qryMsg.get(j);
+						}
+						if (id != null) {
+							str = new SimpleDateFormat("yyyyMMddHHmmss")
+									.format(new java.util.Date());
+							
+							//20141223 add process about status 95 send exception fail
+							if (id.rspID != null && !id.rspID.equals("")&& !id.rspID.equals("--")) {
+								// status is not DELIVERED
+								if (id.status != 2) {
 									try {
-										@SuppressWarnings("unused")
-										long c = Long.parseLong(id.sndFrom);
-										ton = TypeOfNumber.INTERNATIONAL;
-									} catch (NumberFormatException e) {
-										logger.error("not send from number:" + id.sndFrom + ":");
-									}
-									//Query sms status from SMPP
-									QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-									id.status = q4.getMessageState().value();
-									//logger.info("query:" + id.rspID + ",status:" + id.status);
-									
-									//if query result equal to zero,set status to 97(on route)
-									if (id.status == 0) {
-										id.status = 97;
-									}
-									// if (q4.getMessageState() ==
-									// MessageState.DELIVERED) {
-									// 20141103 2 to 9 is final status
-									// 20141112 7 is not final status,assume smpp center have not process yet
-									if (finalStatus.contains(id.status)) {
-										str = "20" + q4.getFinalDate();
-										str = str.substring(0, str.length() - 4);
-										logger.info("remove from check list:final date:"	+ str);
+										//search times add
+										id.fails++;
+										org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+										try {
+											@SuppressWarnings("unused")
+											long c = Long.parseLong(id.sndFrom);
+											ton = TypeOfNumber.INTERNATIONAL;
+										} catch (NumberFormatException e) {
+											logger.error("not send from number:" + id.sndFrom + ":");
+										}
+										//Query sms status from SMPP
+										QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+										id.status = q4.getMessageState().value();
+										//logger.info("query:" + id.rspID + ",status:" + id.status);
 										
-										synchronized (qryMsg) {
-											qryMsg.remove(id);
-											j--;
+										//if query result equal to zero,set status to 97(on route)
+										if (id.status == 0) {
+											id.status = 97;
 										}
-										// yyyy MM dd HH mm ss
-										// 2014 05 20 14 24 04 532+
-										// assume : YYMMDDhhmmss
-									}
-								} catch (NegativeResponseException e3) {
-									if (e3.getMessage().indexOf("67") == -1) {
-					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
-										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										synchronized(getErrorLog()){
-											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										}
-									}
-								} catch (Exception e2) {
-				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
-									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
-									synchronized(getErrorLog()){
-										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
-									}
-									reconnect(id.MsgID);
-								}
-							} else {
-								synchronized (qryMsg) {
-									qryMsg.remove(id);
-									j--;
-								}
-							}
-						} else if (id.rspID != null && id.rspID.equals("--")) {
-							// 20141106 proccess Long SMS
-							//logger.info("checking Long SMS rspids...");
-							// only enroute need be checked
-							if (id.status != 2) {
-								id.fails++;
-
-								//proccess senfrom
-								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
-								try {
-									@SuppressWarnings("unused")
-									long c = Long.parseLong(id.sndFrom);
-									ton = TypeOfNumber.INTERNATIONAL;
-								} catch (NumberFormatException e) {
-									logger.error("not send from number:" + id.sndFrom + ":");
-								}
-
-								//query status
-								boolean reCheck=false;
-								boolean haveUndilivered=false;
-								boolean reject=false;
-								//logger.info("for long SMS rspIDs length is "+id.rspIDs.length);
-
-								for(int i=0;i<id.rspIDs.size();i++){
-									longmsgStatus l= id.rspIDs.get(i);
-									try {
-										if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
-											QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-											l.status = q4.getMessageState().value();
-											//logger.info("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+										// if (q4.getMessageState() ==
+										// MessageState.DELIVERED) {
+										// 20141103 2 to 9 is final status
+										// 20141112 7 is not final status,assume smpp center have not process yet
+										if (finalStatus.contains(id.status)) {
+											str = "20" + q4.getFinalDate();
+											str = str.substring(0, str.length() - 4);
+											logger.info("remove from check list:final date:"	+ str);
 											
-											//20141222 add
-											if(finalStatus.contains(l.status)){
-												str = "20" + q4.getFinalDate();
-												str = str.substring(0, str.length() - 4);
-											}
-
-											if (l.status == 0) {
-												l.status = 97;
-											}
-											if(l.status!=2){
-												haveUndilivered=true;
-											}
-											if(l.status==0 || l.status==1 || l.status==7 || l.status==97){
-												reCheck=true;
-											}
-											if(l.status==8){
-												reject=true;
-											}		
-										}else{
-											logger.info("No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
 											synchronized (qryMsg) {
 												qryMsg.remove(id);
 												j--;
 											}
+											// yyyy MM dd HH mm ss
+											// 2014 05 20 14 24 04 532+
+											// assume : YYMMDDhhmmss
 										}
-										
 									} catch (NegativeResponseException e3) {
 										if (e3.getMessage().indexOf("67") == -1) {
 						                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
@@ -1248,7 +1186,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 												getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 											}
 										}
-										reCheck=true;
 									} catch (Exception e2) {
 					                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 										//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
@@ -1256,152 +1193,245 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 											getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
 										}
 										reconnect(id.MsgID);
-										reCheck=true;
 									}
-								}
-									
-								
-
-								
-								if(reCheck){
-									logger.info("need recheck!");
-									id.status = 1;
-								}else{
-									logger.info("need not recheck!");
+								} else {
 									synchronized (qryMsg) {
 										qryMsg.remove(id);
 										j--;
 									}
+								}
+							} else if (id.rspID != null && id.rspID.equals("--")) {
+								// 20141106 proccess Long SMS
+								//logger.info("checking Long SMS rspids...");
+								// only enroute need be checked
+								if (id.status != 2) {
+									id.fails++;
+
+									//proccess senfrom
+									org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+									try {
+										@SuppressWarnings("unused")
+										long c = Long.parseLong(id.sndFrom);
+										ton = TypeOfNumber.INTERNATIONAL;
+									} catch (NumberFormatException e) {
+										logger.error("not send from number:" + id.sndFrom + ":");
+									}
+
+									//query status
+									boolean reCheck=false;
+									boolean haveUndilivered=false;
+									boolean reject=false;
+									//logger.info("for long SMS rspIDs length is "+id.rspIDs.length);
+
+									for(int i=0;i<id.rspIDs.size();i++){
+										longmsgStatus l= id.rspIDs.get(i);
+										try {
+											if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
+												QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+												l.status = q4.getMessageState().value();
+												//logger.info("part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+												
+												//20141222 add
+												if(finalStatus.contains(l.status)){
+													str = "20" + q4.getFinalDate();
+													str = str.substring(0, str.length() - 4);
+												}
+
+												if (l.status == 0) {
+													l.status = 97;
+												}
+												if(l.status!=2){
+													haveUndilivered=true;
+												}
+												if(l.status==0 || l.status==1 || l.status==7 || l.status==97){
+													reCheck=true;
+												}
+												if(l.status==8){
+													reject=true;
+												}		
+											}else{
+												logger.info("No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
+												synchronized (qryMsg) {
+													qryMsg.remove(id);
+													j--;
+												}
+											}
+											
+										} catch (NegativeResponseException e3) {
+											if (e3.getMessage().indexOf("67") == -1) {
+							                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
+												//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+												synchronized(getErrorLog()){
+													getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+												}
+											}
+											reCheck=true;
+										} catch (Exception e2) {
+						                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
+											//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
+											synchronized(getErrorLog()){
+												getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:" + e2.getMessage());
+											}
+											reconnect(id.MsgID);
+											reCheck=true;
+										}
+									}
+										
 									
-									if (!haveUndilivered) {
-										id.status = 2;
-									} else if (reject) {
-										id.status = 8;
-									} else {
-										id.status = 5;
+
+									
+									if(reCheck){
+										logger.info("need recheck!");
+										id.status = 1;
+									}else{
+										logger.info("need not recheck!");
+										synchronized (qryMsg) {
+											qryMsg.remove(id);
+											j--;
+										}
+										
+										if (!haveUndilivered) {
+											id.status = 2;
+										} else if (reject) {
+											id.status = 8;
+										} else {
+											id.status = 5;
+										}
+									}
+
+								} else {
+									synchronized (qryMsg) {
+										qryMsg.remove(id);
+										j--;
 									}
 								}
 
 							} else {
+								logger.info("No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
 								synchronized (qryMsg) {
 									qryMsg.remove(id);
 									j--;
 								}
 							}
-
-						} else {
-							logger.info("No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
-							synchronized (qryMsg) {
-								qryMsg.remove(id);
-								j--;
-							}
-						}
-						try {
-							//if rspip is exists
-							if (id.rspID != null && !id.rspID.equals("")) {
-								if (id.fails < iFailLimit + 1) {
-									logger.info("msgId="+id.MsgID + ",status=" + id.status+ ",msgseq=" + id.MsgSeq + ",fails="+id.fails+"...");
-									ps.setInt(1, id.tries);
-									ps.setInt(2, id.status);
-									//20150312 change when no rspid,remove msg from query at after sending
-								} /*else {
+							try {
+								//if rspip is exists
+								if (id.rspID != null && !id.rspID.equals("")) {
+									if (id.fails < iFailLimit + 1) {
+										logger.info("msgId="+id.MsgID + ",status=" + id.status+ ",msgseq=" + id.MsgSeq + ",fails="+id.fails+"...");
+										ps.setInt(1, id.tries);
+										ps.setInt(2, id.status);
+										//20150312 change when no rspid,remove msg from query at after sending
+									} /*else {
+										ps.setInt(1, id.tries + 1);
+										//20150129 modifed status 0 to 3(overdue)
+										ps.setInt(2, 3);
+										logger.info("try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
+										synchronized (qryMsg) {
+											qryMsg.remove(id);
+											j--;
+										}
+									}*/
+									// 20141103 if sms has been sended over one day,
+									// no continue trace .
+									if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - (1000 * 60 * 60 * 24 * 1 + 1000 * 60 * 1)))) {
+										logger.info(id.MsgID + "," + id.MsgSeq + " is over one day ...");
+										id.status = 96;
+										ps.setInt(1, id.tries);
+										ps.setInt(2, id.status);
+										synchronized (qryMsg) {
+											qryMsg.remove(id);
+											j--;
+										}
+									}
+								} else {
 									ps.setInt(1, id.tries + 1);
-									//20150129 modifed status 0 to 3(overdue)
-									ps.setInt(2, 3);
-									logger.info("try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
-									synchronized (qryMsg) {
-										qryMsg.remove(id);
-										j--;
-									}
-								}*/
-								// 20141103 if sms has been sended over one day,
-								// no continue trace .
-								if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - (1000 * 60 * 60 * 24 * 1 + 1000 * 60 * 1)))) {
-									logger.info(id.MsgID + "," + id.MsgSeq + " is over one day ...");
-									id.status = 96;
-									ps.setInt(1, id.tries);
 									ps.setInt(2, id.status);
-									synchronized (qryMsg) {
-										qryMsg.remove(id);
-										j--;
+									
+									logger.error("msgid : "+id.MsgID+" haven't rspid!");
+								}
+								ps.setString(5, id.MsgID);
+								ps.setString(3, str);
+								ps.setString(4, id.rspID);
+								ps.setInt(6, id.MsgSeq);
+
+								logger.info("update:" + id.MsgID + ",status:" + id.status + " with time:" + str);
+								ps.executeUpdate();
+
+								//20141222 add update data to response Log table in ten minute
+								if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
+									
+									ps2.setString(1, str);
+									if(id.status==0 || id.status==1 || id.status==97){
+										ps2.setString(2, "R");
+									}else if(id.status==2){
+										ps2.setString(2, "O");
+									}else{
+										ps2.setString(2, "F");
 									}
-								}
-							} else {
-								ps.setInt(1, id.tries + 1);
-								ps.setInt(2, id.status);
-								
-								logger.error("msgid : "+id.MsgID+" haven't rspid!");
-							}
-							ps.setString(5, id.MsgID);
-							ps.setString(3, str);
-							ps.setString(4, id.rspID);
-							ps.setInt(6, id.MsgSeq);
-
-							logger.info("update:" + id.MsgID + ",status:" + id.status + " with time:" + str);
-							ps.executeUpdate();
-
-							//20141222 add update data to response Log table in ten minute
-							if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
-								
-								ps2.setString(1, str);
-								if(id.status==0 || id.status==1 || id.status==97){
-									ps2.setString(2, "R");
-								}else if(id.status==2){
-									ps2.setString(2, "O");
-								}else{
-									ps2.setString(2, "F");
+									
+									ps2.setString(3, id.MsgID);
+									ps2.setString(4, id.sndTo);
+									
+									ps2.executeUpdate();
 								}
 								
-								ps2.setString(3, id.MsgID);
-								ps2.setString(4, id.sndTo);
+								//if id id long SMSmessage
+								if(id.rspIDs!=null && id.rspIDs.size()>0){
+									for (longmsgStatus l : id.rspIDs) {
+										pst.setInt(1, l.status);
+										pst.setString(2, str);
+										pst.setString(3, l.rspID);
+										pst.setString(4, l.MsgID);
+										pst.setInt(5, l.MsgSeq);
+										pst.setInt(6, l.part);
+										pst.executeUpdate();
+									}						
+								}
+		
 								
-								ps2.executeUpdate();
-							}
-							
-							//if id id long SMSmessage
-							if(id.rspIDs!=null && id.rspIDs.size()>0){
-								for (longmsgStatus l : id.rspIDs) {
-									pst.setInt(1, l.status);
-									pst.setString(2, str);
-									pst.setString(3, l.rspID);
-									pst.setString(4, l.MsgID);
-									pst.setInt(5, l.MsgSeq);
-									pst.setInt(6, l.part);
-									pst.executeUpdate();
-								}						
-							}
-	
-							
-						} catch (SQLException e) {
-							logger.error("QueryResultThread got SQLException...",e);
-							//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-							synchronized(getErrorLog()){
-								getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-							}
-							try {
-								ps.close();
-								ps2.close();
-								pst.close();
-								conn.close();
-							} catch (SQLException e1) {
-							}
-							try {
-								conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper", "SmIpp3r");
-								ps = conn.prepareStatement(sql);
-								ps2 = conn.prepareStatement(sql4);
-								pst = conn.prepareStatement(sql2);
-							} catch (SQLException e1) {
+							} catch (SQLException e) {
+								logger.error("QueryResultThread got SQLException...",e);
+								//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+								synchronized(getErrorLog()){
+									getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+								}
+								try {
+									ps.close();
+									ps2.close();
+									pst.close();
+									conn.close();
+								} catch (SQLException e1) {
+								}
+								try {
+									conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper", "SmIpp3r");
+									ps = conn.prepareStatement(sql);
+									ps2 = conn.prepareStatement(sql4);
+									pst = conn.prepareStatement(sql2);
+								} catch (SQLException e1) {
+								}
 							}
 						}
 					}
+				} catch (SQLException e) {
+					logger.error("QueryResultThread get Connection Exception..."+e.getMessage());
+					//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+					synchronized(getErrorLog()){
+						getErrorLog().add(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+					}
+				}finally{
+					try {
+						if(ps!=null)
+							ps.close();
+						if(ps2!=null)
+							ps2.close();
+						if(pst!=null)
+							pst.close();
+						if(conn!=null)
+							conn.close();
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
 				}
-			}
-			try {
-				ps.close();
-				ps2.close();
-				pst.close();
-				conn.close();
-			} catch (SQLException e) {
 			}
 		}
     }
@@ -1571,7 +1601,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     			
     			
     			bulkSize=0;
-    			try{
+    			/*try{
     				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
     				ps = conn.prepareStatement(sql);
     				ps2 = conn.prepareStatement(sql4);
@@ -1591,273 +1621,299 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						getErrorLog().add(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
 					}
     				return;
+    			}*/
+    			
+    			
+    			try{
+    				conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+    				ps = conn.prepareStatement(sql);
+    				ps2 = conn.prepareStatement(sql4);
+    				pst = conn.prepareStatement(sql2);
+    				
+    				if (id != null) {
+
+    					str = new SimpleDateFormat("yyyyMMddHHmmss")
+    							.format(new java.util.Date());
+    					
+    					//20141223 add process about status 95 send exception fail
+    					if (id.rspID != null && !id.rspID.equals("")&& !id.rspID.equals("--")) {
+    						// status is not DELIVERED
+    						if (id.status != 2) {
+    							try {
+    								//search times add
+    								id.fails++;
+    								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+    								try {
+    									long c = Long.parseLong(id.sndFrom);
+    									ton = TypeOfNumber.INTERNATIONAL;
+    								} catch (NumberFormatException e) {
+    									//logger.error("not send from number:" + id.sndFrom + ":");
+    								}
+    								//Query sms status from SMPP
+    								QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+    								id.status = q4.getMessageState().value();
+    								//logger.info("past : " + id.rspID + ",status:" + id.status);
+    								
+    								//if query result equal to zero,set status to 97(on route)
+    								if (id.status == 0) {
+    									id.status = 97;
+    								}
+    								// if (q4.getMessageState() ==
+    								// MessageState.DELIVERED) {
+    								// 20141103 2 to 9 is final status
+    								// 20141112 7 is not final status,assume smpp center have not process yet
+    								if (finalStatus.contains(id.status)) {
+    									str = "20" + q4.getFinalDate();
+    									str = str.substring(0, str.length() - 4);
+    									logger.info("Past : remove from check list:final date:"	+ str);
+    									
+    									synchronized (qryMsgPast) {
+    										qryMsgPast.remove(id);
+    									}
+    									// yyyy MM dd HH mm ss
+    									// 2014 05 20 14 24 04 532+
+    									// assume : YYMMDDhhmmss
+    								}
+    							} catch (NegativeResponseException e3) {
+    								if (e3.getMessage().indexOf("67") == -1) {
+    				                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
+    									//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+    									synchronized(getErrorLog()){
+    										getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+    									}
+    								}
+    							} catch (Exception e2) {
+    			                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
+    								//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+    								synchronized(getErrorLog()){
+    									getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+    								}
+    								reconnect(id.MsgID);
+    							}
+    						} else {
+    							synchronized (qryMsgPast) {
+    								qryMsgPast.remove(id);
+    							}
+    						}
+    					} else if (id.rspID != null && id.rspID.equals("--")) {
+    						// 20141106 proccess Long SMS
+    						//logger.info("checking Long SMS rspids...");
+    						// only enroute need be checked
+    						if (id.status != 2) {
+    							id.fails++;
+
+    							//proccess senfrom
+    							org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
+    							try {
+    								long c = Long.parseLong(id.sndFrom);
+    								ton = TypeOfNumber.INTERNATIONAL;
+    							} catch (NumberFormatException e) {
+    								//logger.error("Past : not send from number:" + id.sndFrom + ":");
+    							}
+
+    							//query status
+    							boolean reCheck=false;
+    							boolean haveUndilivered=false;
+    							boolean reject=false;
+    							//logger.info("for long SMS rspIDs length is "+id.rspIDs.length);
+
+    							for(int i=0;i<id.rspIDs.size();i++){
+    								longmsgStatus l= id.rspIDs.get(i);
+    								try {
+    									if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
+    										QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
+    										l.status = q4.getMessageState().value();
+    										//logger.info("past : part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
+    										
+    										//20141222 add
+    										if(finalStatus.contains(l.status)){
+    											str = "20" + q4.getFinalDate();
+    											str = str.substring(0, str.length() - 4);
+    										}
+
+    										if (l.status == 0) {
+    											l.status = 97;
+    										}
+    										if(l.status!=2){
+    											haveUndilivered=true;
+    										}
+    										if(l.status==0 || l.status==1 || l.status==7 || l.status==97){
+    											reCheck=true;
+    										}
+    										if(l.status==8){
+    											reject=true;
+    										}		
+    									}else{
+    										logger.info("Past : No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
+    										synchronized (qryMsgPast) {
+    											qryMsgPast.remove(id);
+    										}
+    									}
+    									
+    								} catch (NegativeResponseException e3) {
+    									if (e3.getMessage().indexOf("67") == -1) {
+    					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
+    										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+    										synchronized(getErrorLog()){
+    											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+    										}
+    									}
+    									reCheck=true;
+    								} catch (Exception e2) {
+    				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
+    									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+    									synchronized(getErrorLog()){
+    										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+    									}
+    									reconnect(id.MsgID);
+    									reCheck=true;
+    								}
+    							}
+    								
+    							
+
+    							
+    							if(reCheck){
+    								logger.info("Past : need recheck!");
+    								id.status = 1;
+    							}else{
+    								logger.info("Past : need not recheck!");
+    								synchronized (qryMsgPast) {
+    									qryMsgPast.remove(id);
+    								}
+    								
+    								if (!haveUndilivered) {
+    									id.status = 2;
+    									synchronized (qryMsgPast) {
+    										qryMsgPast.remove(id);
+    									}
+    								} else if (reject) {
+    									id.status = 8;
+    								} else {
+    									id.status = 5;
+    								}
+    							}
+
+    						} else {
+    							synchronized (qryMsgPast) {
+    								qryMsgPast.remove(id);
+    							}
+    						}
+    					} else {
+    						logger.info("Past : No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
+    						synchronized (qryMsgPast) {
+    							qryMsgPast.remove(id);
+    						}
+    					}
+    					try {
+    						//if rspip is exists
+    						if (id.rspID != null && !id.rspID.equals("")) {
+    							if (id.fails < iFailLimit + 1) {
+    								//logger.info("Past : msgId="+id.MsgID + ",status=" + id.status+ ",msgseq" + id.MsgSeq + "fails="+id.fails+"...");
+    								ps.setInt(1, id.tries);
+    								ps.setInt(2, id.status);
+    							} else {
+    								ps.setInt(1, id.tries + 1);
+    								//20150129 modifed status 0 to 3(overdue)
+    								ps.setInt(2, 3);
+    								logger.info("Past : try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
+    								synchronized (qryMsgPast) {
+    									qryMsgPast.remove(id);
+    								}
+    							}
+    							// 20141103 if sms has been sended over one day,
+    							// no continue trace .
+    							if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
+    								logger.info("Past : "+id.MsgID + "," + id.MsgSeq + " is over one day ...");
+    								id.status = 96;
+    								ps.setInt(1, id.tries);
+    								ps.setInt(2, id.status);
+    								synchronized (qryMsgPast) {
+    									qryMsgPast.remove(id);
+    								}
+    							}
+    						} else {
+    							ps.setInt(1, id.tries + 1);
+    							ps.setInt(2, id.status);
+    							
+    							logger.error("Past : msgid : "+id.MsgID+" haven't rspid!");
+    						}
+    						ps.setString(5, id.MsgID);
+    						ps.setString(3, str);
+    						ps.setString(4, id.rspID);
+    						ps.setInt(6, id.MsgSeq);
+
+    						//logger.info("Past : update:" + id.MsgID + ",status:" + id.status + " with time:" + str);
+    						ps.executeUpdate();
+
+    						//20141222 add update data to response Log table in ten minute
+    						if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
+    							
+    							ps2.setString(1, str);
+    							if(id.status==0 || id.status==1 || id.status==97){
+    								ps2.setString(2, "R");
+    							}else if(id.status==2){
+    								ps2.setString(2, "O");
+    							}else{
+    								ps2.setString(2, "F");
+    							}
+    							
+    							ps2.setString(3, id.MsgID);
+    							ps2.setString(4, id.sndTo);
+    							
+    							ps2.executeUpdate();
+    						}
+    						
+    						//if id id long SMSmessage
+    						if(id.rspIDs!=null && id.rspIDs.size()>0){
+    							for (longmsgStatus l : id.rspIDs) {
+    								pst.setInt(1, l.status);
+    								pst.setString(2, str);
+    								pst.setString(3, l.rspID);
+    								pst.setString(4, l.MsgID);
+    								pst.setInt(5, l.MsgSeq);
+    								pst.setInt(6, l.part);
+    								pst.executeUpdate();
+    							}						
+    						}
+
+    						
+    					} catch (SQLException e) {
+    						logger.error("QueryResultThread got SQLException...",e);
+    						//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+    						synchronized(getErrorLog()){
+    							getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
+    						}	
+    					}finally{
+    						try {
+    							ps.close();
+    							ps2.close();
+    							pst.close();
+    							conn.close();
+    						} catch (SQLException e1) {
+    						}
+    					}
+    				
+    				}
+    			}catch (SQLException e){
+    				logger.error("QueryPastThread get Connection Exception..."+e.getMessage());
+    				synchronized(getErrorLog()){
+						getErrorLog().add(errorAddInfo()+"Because QueryPastThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+					}
+    			}finally{
+    				try{
+    					if(ps!=null)
+    						ps.close();
+    					if(ps2!=null)
+    						ps2.close();
+    					if(pst!=null)
+    						pst.close();
+    					if(conn!=null)
+    						conn.close();
+    				}catch(SQLException e){
+    					e.printStackTrace();
+    				}
     			}
-
-    			//xxx
-				if (id != null) {
-					str = new SimpleDateFormat("yyyyMMddHHmmss")
-							.format(new java.util.Date());
-					
-					//20141223 add process about status 95 send exception fail
-					if (id.rspID != null && !id.rspID.equals("")&& !id.rspID.equals("--")) {
-						// status is not DELIVERED
-						if (id.status != 2) {
-							try {
-								//search times add
-								id.fails++;
-								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
-								try {
-									long c = Long.parseLong(id.sndFrom);
-									ton = TypeOfNumber.INTERNATIONAL;
-								} catch (NumberFormatException e) {
-									//logger.error("not send from number:" + id.sndFrom + ":");
-								}
-								//Query sms status from SMPP
-								QuerySmResult q4 = smppSession.queryShortMessage( id.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-								id.status = q4.getMessageState().value();
-								//logger.info("past : " + id.rspID + ",status:" + id.status);
-								
-								//if query result equal to zero,set status to 97(on route)
-								if (id.status == 0) {
-									id.status = 97;
-								}
-								// if (q4.getMessageState() ==
-								// MessageState.DELIVERED) {
-								// 20141103 2 to 9 is final status
-								// 20141112 7 is not final status,assume smpp center have not process yet
-								if (finalStatus.contains(id.status)) {
-									str = "20" + q4.getFinalDate();
-									str = str.substring(0, str.length() - 4);
-									logger.info("Past : remove from check list:final date:"	+ str);
-									
-									synchronized (qryMsgPast) {
-										qryMsgPast.remove(id);
-									}
-									// yyyy MM dd HH mm ss
-									// 2014 05 20 14 24 04 532+
-									// assume : YYMMDDhhmmss
-								}
-							} catch (NegativeResponseException e3) {
-								if (e3.getMessage().indexOf("67") == -1) {
-				                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
-									//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-									synchronized(getErrorLog()){
-										getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-									}
-								}
-							} catch (Exception e2) {
-			                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
-								//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-								synchronized(getErrorLog()){
-									getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-								}
-								reconnect(id.MsgID);
-							}
-						} else {
-							synchronized (qryMsgPast) {
-								qryMsgPast.remove(id);
-							}
-						}
-					} else if (id.rspID != null && id.rspID.equals("--")) {
-						// 20141106 proccess Long SMS
-						//logger.info("checking Long SMS rspids...");
-						// only enroute need be checked
-						if (id.status != 2) {
-							id.fails++;
-
-							//proccess senfrom
-							org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
-							try {
-								long c = Long.parseLong(id.sndFrom);
-								ton = TypeOfNumber.INTERNATIONAL;
-							} catch (NumberFormatException e) {
-								//logger.error("Past : not send from number:" + id.sndFrom + ":");
-							}
-
-							//query status
-							boolean reCheck=false;
-							boolean haveUndilivered=false;
-							boolean reject=false;
-							//logger.info("for long SMS rspIDs length is "+id.rspIDs.length);
-
-							for(int i=0;i<id.rspIDs.size();i++){
-								longmsgStatus l= id.rspIDs.get(i);
-								try {
-									if(l.rspID!=null && !"".equalsIgnoreCase(l.rspID)){
-										QuerySmResult q4 = smppSession.queryShortMessage(l.rspID,ton,NumberingPlanIndicator.UNKNOWN,id.sndFrom);
-										l.status = q4.getMessageState().value();
-										//logger.info("past : part=" + l.part+",query:"+ l.rspID + ",status:"+ l.status);
-										
-										//20141222 add
-										if(finalStatus.contains(l.status)){
-											str = "20" + q4.getFinalDate();
-											str = str.substring(0, str.length() - 4);
-										}
-
-										if (l.status == 0) {
-											l.status = 97;
-										}
-										if(l.status!=2){
-											haveUndilivered=true;
-										}
-										if(l.status==0 || l.status==1 || l.status==7 || l.status==97){
-											reCheck=true;
-										}
-										if(l.status==8){
-											reject=true;
-										}		
-									}else{
-										logger.info("Past : No response ID " + l.MsgID + ","+ l.MsgSeq + l.part+"...");
-										synchronized (qryMsgPast) {
-											qryMsgPast.remove(id);
-										}
-									}
-									
-								} catch (NegativeResponseException e3) {
-									if (e3.getMessage().indexOf("67") == -1) {
-					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
-										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										synchronized(getErrorLog()){
-											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
-										}
-									}
-									reCheck=true;
-								} catch (Exception e2) {
-				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
-									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-									synchronized(getErrorLog()){
-										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
-									}
-									reconnect(id.MsgID);
-									reCheck=true;
-								}
-							}
-								
-							
-
-							
-							if(reCheck){
-								logger.info("Past : need recheck!");
-								id.status = 1;
-							}else{
-								logger.info("Past : need not recheck!");
-								synchronized (qryMsgPast) {
-									qryMsgPast.remove(id);
-								}
-								
-								if (!haveUndilivered) {
-									id.status = 2;
-									synchronized (qryMsgPast) {
-										qryMsgPast.remove(id);
-									}
-								} else if (reject) {
-									id.status = 8;
-								} else {
-									id.status = 5;
-								}
-							}
-
-						} else {
-							synchronized (qryMsgPast) {
-								qryMsgPast.remove(id);
-							}
-						}
-					} else {
-						logger.info("Past : No response ID " + id.MsgID + ","+ id.MsgSeq + "...");
-						synchronized (qryMsgPast) {
-							qryMsgPast.remove(id);
-						}
-					}
-					try {
-						//if rspip is exists
-						if (id.rspID != null && !id.rspID.equals("")) {
-							if (id.fails < iFailLimit + 1) {
-								//logger.info("Past : msgId="+id.MsgID + ",status=" + id.status+ ",msgseq" + id.MsgSeq + "fails="+id.fails+"...");
-								ps.setInt(1, id.tries);
-								ps.setInt(2, id.status);
-							} else {
-								ps.setInt(1, id.tries + 1);
-								//20150129 modifed status 0 to 3(overdue)
-								ps.setInt(2, 3);
-								logger.info("Past : try query fails times " + id.MsgID + "," + id.MsgSeq + "...");
-								synchronized (qryMsgPast) {
-									qryMsgPast.remove(id);
-								}
-							}
-							// 20141103 if sms has been sended over one day,
-							// no continue trace .
-							if (!finalStatus.contains(id.status) && id.sendDate!=null && id.sendDate.before(new Date(new Date().getTime() - 1000 * 60 * 60 * 24 * 1))) {
-								logger.info("Past : "+id.MsgID + "," + id.MsgSeq + " is over one day ...");
-								id.status = 96;
-								ps.setInt(1, id.tries);
-								ps.setInt(2, id.status);
-								synchronized (qryMsgPast) {
-									qryMsgPast.remove(id);
-								}
-							}
-						} else {
-							ps.setInt(1, id.tries + 1);
-							ps.setInt(2, id.status);
-							
-							logger.error("Past : msgid : "+id.MsgID+" haven't rspid!");
-						}
-						ps.setString(5, id.MsgID);
-						ps.setString(3, str);
-						ps.setString(4, id.rspID);
-						ps.setInt(6, id.MsgSeq);
-
-						//logger.info("Past : update:" + id.MsgID + ",status:" + id.status + " with time:" + str);
-						ps.executeUpdate();
-
-						//20141222 add update data to response Log table in ten minute
-						if(id.isres && id.sendDate!=null &&new Date().before(new Date(id.sendDate.getTime()+600000))){
-							
-							ps2.setString(1, str);
-							if(id.status==0 || id.status==1 || id.status==97){
-								ps2.setString(2, "R");
-							}else if(id.status==2){
-								ps2.setString(2, "O");
-							}else{
-								ps2.setString(2, "F");
-							}
-							
-							ps2.setString(3, id.MsgID);
-							ps2.setString(4, id.sndTo);
-							
-							ps2.executeUpdate();
-						}
-						
-						//if id id long SMSmessage
-						if(id.rspIDs!=null && id.rspIDs.size()>0){
-							for (longmsgStatus l : id.rspIDs) {
-								pst.setInt(1, l.status);
-								pst.setString(2, str);
-								pst.setString(3, l.rspID);
-								pst.setString(4, l.MsgID);
-								pst.setInt(5, l.MsgSeq);
-								pst.setInt(6, l.part);
-								pst.executeUpdate();
-							}						
-						}
-
-						
-					} catch (SQLException e) {
-						logger.error("QueryResultThread got SQLException...",e);
-						//sendmail("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-						synchronized(getErrorLog()){
-							getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
-						}	
-					}finally{
-						try {
-							ps.close();
-							ps2.close();
-							pst.close();
-							conn.close();
-						} catch (SQLException e1) {
-						}
-					}
-				}
-			
             }
         };
 	}
