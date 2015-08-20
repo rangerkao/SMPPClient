@@ -88,13 +88,14 @@ public class StressClient implements Runnable {
     private static String password;
     private static String sourceAddr;
     private static String destinationAddr;
-		private static String FailLimit;
-		private static String RetryLimit;
-		private static String SendPeriod,AlertMailTo,QuertPeriod,QuertPastPeriod;
-		private static int iQuertPastPeriod;
-		private static int iQuertPeriod;
-		private static int iSendPeriod;
-		private static int iFailLimit;
+	private static String Host_IP;
+	private static String FailLimit;
+	private static String RetryLimit;
+	private static String SendPeriod,AlertMailTo,QuertPeriod,QuertPastPeriod;
+	private static int iQuertPastPeriod;
+	private static int iQuertPeriod;
+	private static int iSendPeriod;
+	private static int iFailLimit;
     private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();
     
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
@@ -263,6 +264,9 @@ public class StressClient implements Runnable {
 
 		} catch (ParseException e) {
 			logger.error("setPastqueryError ParseException",e);
+			synchronized(getErrorLog()){
+				getErrorLog().add(errorAddInfo()+"set Pastquery got ParseException"+"Error Msg"+e.getMessage());
+			}
 		}finally{
 			
 			try {
@@ -279,7 +283,10 @@ public class StressClient implements Runnable {
 					rs.close();
 				}
 			} catch (SQLException e) {
-				e.printStackTrace();
+				logger.error("setPastqueryError at close connection get exception",e);
+				synchronized(getErrorLog()){
+					getErrorLog().add(errorAddInfo()+"at close connection got error. "+"Error Msg"+e.getMessage());
+				}
 			}
 		}
 		
@@ -474,7 +481,11 @@ public class StressClient implements Runnable {
 					if(conn!=null)
 						conn.close();
 				}catch(Exception e){
-				
+					logger.error("run at close Connection got Exception..."+e.getMessage());
+					//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+					synchronized(getErrorLog()){
+						getErrorLog().add(errorAddInfo()+"run at close Connection got Exception. "+"Error Msg"+e.getMessage());
+					}
 				}
 			}
 			
@@ -756,8 +767,9 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		void sendmail(String msg){
 			String ip ="";
 			try {
-				ip = InetAddress.getLocalHost().getHostAddress();
-			} catch (UnknownHostException e1) {
+				//ip = InetAddress.getLocalHost().getHostAddress();
+				ip=Host_IP;
+			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
 			
@@ -1016,18 +1028,23 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							}
 						}
 					} catch (SQLException e) {
-						logger.error("Occured error:"+e);
-						e.printStackTrace();
+						logger.error("submitted got SQLException..."+e.getMessage());
+						//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+						synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"submitted got SQLException. "+"Error Msg"+e.getMessage());
+						}
 					}finally{
-
-						
 						try {
 							if(conn!=null)conn.close();
 							if(ps!=null) ps.close();
 							if(ps2!=null)ps2.close();
 							if(ps3!=null)ps3.close();
 						} catch (SQLException e) {
-							e.printStackTrace();
+							logger.error("submitted at close Connection got Exception..."+e.getMessage());
+							//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+							synchronized(getErrorLog()){
+								getErrorLog().add(errorAddInfo()+"submitted at close Connection got Exception. "+"Error Msg"+e.getMessage());
+							}
 						}
 					}
 
@@ -1396,11 +1413,20 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
 								}
 								try {
-									ps.close();
-									ps2.close();
-									pst.close();
-									conn.close();
+									if(ps!=null)
+										ps.close();
+									if(ps2!=null)
+										ps2.close();
+									if(pst!=null)
+										pst.close();
+									if(conn!=null)
+										conn.close();
 								} catch (SQLException e1) {
+									logger.error("QueryResultThread gst close Connection got Exception..."+e.getMessage());
+									//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+									synchronized(getErrorLog()){
+										getErrorLog().add(errorAddInfo()+"QueryResultThread gst close Connection got Exception. "+"Error Msg"+e.getMessage());
+									}
 								}
 								try {
 									conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper", "SmIpp3r");
@@ -1429,7 +1455,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						if(conn!=null)
 							conn.close();
 					} catch (SQLException e) {
-						e.printStackTrace();
+						logger.error("QueryResultThread gst close Connection got Exception..."+e.getMessage());
+						//sendmail(errorAddInfo()+"Because QueryResultThread can't connect to DB,return. "+"Error Msg"+e.getMessage());
+						synchronized(getErrorLog()){
+							getErrorLog().add(errorAddInfo()+"QueryResultThread gst close Connection got Exception. "+"Error Msg"+e.getMessage());
+						}
 					}
 				}
 			}
@@ -1461,6 +1491,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         FileInputStream fis = new FileInputStream("StressClient.properties");
         prop.load(fis);
         fis.close();
+        		Host_IP=prop.getProperty("Host_IP");
 				RetryLimit=prop.getProperty("RetryLimit");
 				FailLimit=prop.getProperty("FailLimit");
 				iFailLimit=Integer.parseInt(FailLimit);
@@ -1884,16 +1915,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     						synchronized(getErrorLog()){
     							getErrorLog().add("QueryResultThread got SQLException...<br> Exception message:"+e.getMessage());
     						}	
-    					}finally{
-    						try {
-    							ps.close();
-    							ps2.close();
-    							pst.close();
-    							conn.close();
-    						} catch (SQLException e1) {
-    						}
     					}
-    				
     				}
     			}catch (SQLException e){
     				logger.error("QueryPastThread get Connection Exception..."+e.getMessage());
@@ -1911,7 +1933,10 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     					if(conn!=null)
     						conn.close();
     				}catch(SQLException e){
-    					e.printStackTrace();
+    					logger.error("QueryResultThread ParseException",e);
+    					synchronized(getErrorLog()){
+    						getErrorLog().add(errorAddInfo()+"at close connection got error. "+"Error Msg"+e.getMessage());
+    					}
     				}
     			}
             }
