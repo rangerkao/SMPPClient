@@ -32,6 +32,7 @@ import java.sql.*;
 import java.util.*;
 import java.text.*;
 
+import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.jsmpp.InvalidResponseException;
 import org.jsmpp.PDUException;
@@ -45,23 +46,15 @@ import org.jsmpp.bean.SMSCDeliveryReceipt;
 import org.jsmpp.extra.NegativeResponseException;
 import org.jsmpp.extra.ResponseTimeoutException;
 import org.jsmpp.extra.SessionState;
-import org.jsmpp.session.MessageReceiverListener;
 import org.jsmpp.session.SMPPSession;
-import org.jsmpp.bean.OptionalParameter;
-import org.jsmpp.bean.OptionalParameter.Tag;
-import org.jsmpp.util.AbsoluteTimeFormatter;
-import org.jsmpp.util.TimeFormatter;
 import org.jsmpp.session.QuerySmResult;
-import org.jsmpp.bean.MessageState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.jsmpp.bean.MessageClass;
 import org.jsmpp.bean.Alphabet;
 
 public class StressClient implements Runnable {
     private static final String DEFAULT_PASSWORD = "test17";
     private static final String DEFAULT_SYSID = "17life";
-    private static final Logger logger = LoggerFactory.getLogger(StressClient.class);
+    private static Logger logger;
     private static final String DEFAULT_LOG4J_PATH = "client-log4j.properties";
     private static  String DEFAULT_HOST = "10.42.1.163";
     private static final Integer DEFAULT_PORT = 2775;
@@ -72,18 +65,20 @@ public class StressClient implements Runnable {
     
     private static Integer THREADCOUNT=100;
     private AtomicInteger requestCounter = new AtomicInteger();
-    private AtomicInteger totalRequestCounter = new AtomicInteger();
+  //not use at 20150820 mark
+    /*private AtomicInteger totalRequestCounter = new AtomicInteger();
+    private AtomicInteger totalResponseCounter = new AtomicInteger();*/
     private AtomicInteger responseCounter = new AtomicInteger();
-    private AtomicInteger totalResponseCounter = new AtomicInteger();
     private AtomicLong maxDelay = new AtomicLong();
     private ExecutorService execService;
     private ExecutorService execQueryService;
     private String host;
+    @SuppressWarnings("unused")
+	private int id;
     private int port;
     private int bulkSize;
     private SMPPSession smppSession = new SMPPSession();
     private AtomicBoolean exit = new AtomicBoolean();
-    private int id;
     private static String systemId;
     private static String password;
     private static String sourceAddr;
@@ -96,7 +91,8 @@ public class StressClient implements Runnable {
 	private static int iQuertPeriod;
 	private static int iSendPeriod;
 	private static int iFailLimit;
-    private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();
+	//not use at 20150820 mark
+    /*private static TimeFormatter timeFormatter = new AbsoluteTimeFormatter();*/
     
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
     
@@ -142,6 +138,7 @@ public class StressClient implements Runnable {
         this.host = host;
         this.port = port;
         this.bulkSize = bulkSize;
+      //not use at 20150820 mark
         this.systemId = systemId;
         this.password = password;
         this.sourceAddr = sourceAddr;
@@ -155,10 +152,11 @@ public class StressClient implements Runnable {
 			curSeq++;
 			return curSeq;
 		}
-    private void shutdown() {
+	//not use at 20150820 mark
+    /*private void shutdown() {
         execService.shutdown();
         exit.set(true);
-    }
+    }*/
     //20150316 modify add select status 97
     public void setQueryPast(){
     	logger.info("setQueryPast...");
@@ -296,6 +294,10 @@ public class StressClient implements Runnable {
     }
     
     public void run() {
+    	
+    	//20150820 add listener
+    	smppSession.setMessageReceiverListener(new Listener());
+    	
         try {
             smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,password, "cln", TypeOfNumber.UNKNOWN,NumberingPlanIndicator.UNKNOWN, null);
             logger.info("Bound to " + host + ":" + port);
@@ -464,8 +466,10 @@ public class StressClient implements Runnable {
 					logger.info("Sended " + bulkSize + " message...");
 				}
 			} catch (SQLException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
+				logger.error("At run get exception",e1);
+				synchronized(getErrorLog()){
+					getErrorLog().add(errorAddInfo()+"At run get exception"+e1.getMessage());
+				}
 			}finally{
 				try{
 					if(rs!=null)
@@ -633,7 +637,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				//Call session.submitShortMessage() method
 				//passing msgPart array for shortMessage 
 				//argument and esm for ESMClass argument
-				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm           , (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, msgPart);
+				rspIDs[i]=submitSMS(ton,msg.sndFrom, msg.sndTo, esm,new GeneralDataCoding(8),msgPart);
 				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
 				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 				
@@ -644,8 +648,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				l.part=i+1;
 				l.status=97;
 				l.rspID=rspIDs[i];
-				msg.rspIDs.add(l);
-				
+				msg.rspIDs.add(l);				
 			}
 			if (remain==1){
 				udh[5]=(byte)(i+1);
@@ -653,7 +656,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				System.arraycopy(udh, 0, msgPartRemain , 0, 6);
 				System.arraycopy(msgBytes, i*134, msgPartRemain , 6, (msgBytes.length%134));
 				System.out.println("sending parts:"+msgPartRemain[0]+","+msgPartRemain[1]+","+msgPartRemain[2]+","+msgPartRemain[3]+","+msgPartRemain[4]+","+msgPartRemain[5]);
-				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, msgPartRemain);
+				rspIDs[i]=submitSMS(ton,msg.sndFrom,msg.sndTo, esm,new GeneralDataCoding(8),msgPartRemain);
 				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
 				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 				
@@ -680,6 +683,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			//return 2;
 			return 97;
 		}
+
     int sendAsciiLong(byte[] msgBytes,msgStatus msg) throws Exception{
 			int remain=0;
 			byte[] udh = new byte[6];
@@ -719,7 +723,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				//Call session.submitShortMessage() method
 				//passing msgPart array for shortMessage 
 				//argument and esm for ESMClass argument
-				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msgPart);
+				rspIDs[i]=submitSMS(ton,msg.sndFrom,msg.sndTo, esm,new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT),msgPart);
 				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
 				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 				
@@ -738,7 +742,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				System.arraycopy(udh, 0, msgPartRemain , 0, 6);
 				System.arraycopy(msgBytes, i*154, msgPartRemain , 6, (msgBytes.length%154));
 				System.out.println("sending parts:"+msgPartRemain[0]+","+msgPartRemain[1]+","+msgPartRemain[2]+","+msgPartRemain[3]+","+msgPartRemain[4]+","+msgPartRemain[5]);
-				rspIDs[i]=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, esm, (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msgPartRemain);
+				rspIDs[i]=submitSMS(ton,msg.sndFrom,msg.sndTo,esm,new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT),msgPartRemain);
 				System.out.println("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i]);
 				logger.info("The SM "+msg.MsgID+" "+(i+1)+"th part has rspIDs "+rspIDs[i] );
 				
@@ -764,6 +768,22 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			//return 2;
 			return 97;
 		}
+    
+    	String submitSMS(TypeOfNumber sourceAddrTon,String sourceAddr,String destinationAddr,ESMClass esmClass,
+    			GeneralDataCoding dataCoding,byte[] shortMessage) throws PDUException, ResponseTimeoutException, InvalidResponseException, NegativeResponseException, IOException{
+    											
+    		return smppSession.submitShortMessage(
+				//	serviceType	, sourceAddrTon	, sourceAddrNpi					, sourceAddr, 
+    				""			, sourceAddrTon , NumberingPlanIndicator.UNKNOWN, sourceAddr, 
+				//	destAddrTon					, destAddrNpi					, destinationAddr, esmClass, protocolId, 
+    				TypeOfNumber.INTERNATIONAL	, NumberingPlanIndicator.UNKNOWN, destinationAddr, esmClass, (byte)0, 
+    			//	priorityFlag, scheduleDeliveryTime	, validityPeriod, 
+    				(byte)0		,  ""					, null			, 
+    			//	registeredDelivery									, replaceIfPresentFlag	, 
+    				new RegisteredDelivery(SMSCDeliveryReceipt.SUCCESS_FAILURE)	, (byte)0				, 
+    			//	dataCoding, smDefaultMsgId	, shortMessage, optionalParameters)
+    				dataCoding,(byte)0			, shortMessage);
+    	}
 		void sendmail(String msg){
 			String ip ="";
 			try {
@@ -804,6 +824,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 					try {
 						Thread.sleep(1*1000);
 						smppSession =new SMPPSession();
+						smppSession.setMessageReceiverListener(new Listener());
 			            smppSession.connectAndBind(host, port, BindType.BIND_TRX, systemId,
 			                    password, "cln", TypeOfNumber.UNKNOWN,
 			                    NumberingPlanIndicator.UNKNOWN, null);
@@ -872,7 +893,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								msg.status=97;
 										
 							}else{
-								rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT), (byte)0, msg.MsgBody.getBytes("iso8859-1"));
+								rspMsgID=submitSMS(ton,msg.sndFrom,msg.sndTo,new ESMClass(),new GeneralDataCoding(false, true, MessageClass.CLASS1, Alphabet.ALPHA_DEFAULT),msg.MsgBody.getBytes("iso8859-1"));
 								logger.info("submitted:"+msg.sndTo+",rspid:"+rspMsgID+",seq:"+msg.MsgSeq);		
 								msg.rspID=rspMsgID;
 								msg.status=97;
@@ -889,7 +910,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 							}else{
 								byte[] c=new byte[b.length-2];
 								System.arraycopy(b, 2, c , 0, c.length);
-								rspMsgID=smppSession.submitShortMessage("", ton , NumberingPlanIndicator.UNKNOWN, msg.sndFrom, TypeOfNumber.INTERNATIONAL, NumberingPlanIndicator.UNKNOWN, msg.sndTo, new ESMClass(), (byte)0, (byte)0,  "", null, new RegisteredDelivery(SMSCDeliveryReceipt.DEFAULT), (byte)0, new GeneralDataCoding(8), (byte)0, c);
+								rspMsgID=submitSMS(ton,msg.sndFrom,msg.sndTo,new ESMClass(),new GeneralDataCoding(8),c);
 								logger.info("submitted:"+msg.sndTo+",rspid:"+rspMsgID+",seq:"+msg.MsgSeq);
 								msg.rspID=rspMsgID;
 								msg.status=97;
@@ -1001,7 +1022,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						if(95!=msg.status){
 							//If is long SMS message 
 							if("--".equals(msg.rspID)){
-								String sql2="insert into longmsgitem (msgid,seq,part) Values(?,?,?) ";
+								String sql2="insert into longmsgitem (msgid,seq,part,rspid) Values(?,?,?,?) ";
 								ps2 = conn.prepareStatement(sql2);
 								for(int i=0;i<msg.rspIDs.size();i++){
 									longmsgStatus l= msg.rspIDs.get(i);
@@ -1009,6 +1030,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 									ps2.setString(1, l.MsgID);
 									ps2.setInt(2, l.MsgSeq);
 									ps2.setInt(3, l.part);
+									ps2.setString(4, l.rspID);
 									ps2.executeUpdate();
 								}
 							}
@@ -1052,8 +1074,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				}
         };
     }
-    
-    private class TrafficWatcherThread extends Thread {
+    //not used at 20150820 mark
+   /* private class TrafficWatcherThread extends Thread {
         @Override
         public void run() {
             logger.info("Starting traffic watcher...");
@@ -1070,7 +1092,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
                 logger.info("Request/Response per second : " + requestPerSecond + "/" + responsePerSecond + " of " + total + " maxDelay=" + maxDelayPerSecond);
             }
         }
-    }
+    }*/
   
     
     static Set<Integer> finalStatus = new HashSet<Integer>();
@@ -1469,10 +1491,45 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     static List<String> resUserID = new ArrayList<String>();
     public static void main(String[] args) throws Exception{
         
+    	
+    	
         String systemId = DEFAULT_SYSID;
         String password = DEFAULT_PASSWORD;
         String sourceAddr = "";
         String destinationAddr = "";
+        
+        String host = DEFAULT_HOST;
+		 int port;
+		 port = DEFAULT_PORT;
+        
+		 long transactionTimer;
+		 transactionTimer = DEFAULT_TRANSACTIONTIMER;
+        
+		 int bulkSize;
+		 bulkSize = DEFAULT_BULK_SIZE;
+        
+		 int processorDegree;
+		 processorDegree = DEFAULT_PROCESSOR_DEGREE;
+        
+		 int maxOutstanding;
+		 maxOutstanding = DEFAULT_MAX_OUTSTANDING;
+        
+        String log4jPath =DEFAULT_LOG4J_PATH;
+        PropertyConfigurator.configure(log4jPath);
+        logger =Logger.getLogger(StressClient.class);
+        logger.info("Target server "+ host+" "+port);
+        logger.info("System ID: "+ systemId);
+        logger.info("Password: "+ password);
+        logger.info("Transaction timer: "+ transactionTimer);
+        logger.info("Bulk size: "+ bulkSize);
+        logger.info("Max outstanding: "+ maxOutstanding);
+        logger.info("Processor degree: "+ processorDegree);
+		logger.info("Fail Limit: "+ FailLimit);
+		logger.info("send Period: "+ iSendPeriod);
+		logger.info("query Period: "+ iQuertPeriod);
+		logger.info("query Past Period: "+ iQuertPastPeriod);
+        logger.info("AlertMailTo: "+ AlertMailTo);
+        
         if (args.length > 0) {
             try {
             	
@@ -1487,8 +1544,9 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         Class.forName("org.postgresql.Driver");
 				DriverManager.setLoginTimeout(10);
  
-        Properties prop = new Properties();
+        
         FileInputStream fis = new FileInputStream("StressClient.properties");
+        Properties prop = new Properties();
         prop.load(fis);
         fis.close();
         		Host_IP=prop.getProperty("Host_IP");
@@ -1505,36 +1563,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				if(prop.getProperty("DEFAULT_HOST")!=null)
 				DEFAULT_HOST=prop.getProperty("DEFAULT_HOST");
 				
-		String host = DEFAULT_HOST;
-		 int port;
-	        port = DEFAULT_PORT;
-	        
-	        long transactionTimer;
-	        transactionTimer = DEFAULT_TRANSACTIONTIMER;
-	        
-	        int bulkSize;
-	        bulkSize = DEFAULT_BULK_SIZE;
-	        
-	        int processorDegree;
-	        processorDegree = DEFAULT_PROCESSOR_DEGREE;
-	        
-	        int maxOutstanding;
-	        maxOutstanding = DEFAULT_MAX_OUTSTANDING;
-	        
-        String log4jPath =DEFAULT_LOG4J_PATH;
-        PropertyConfigurator.configure(log4jPath);
-        logger.info("Target server {}:{}", host, port);
-        logger.info("System ID: {}", systemId);
-        logger.info("Password: {}", password);
-        logger.info("Transaction timer: {}", transactionTimer);
-        logger.info("Bulk size: {}", bulkSize);
-        logger.info("Max outstanding: {}", maxOutstanding);
-        logger.info("Processor degree: {}", processorDegree);
-		logger.info("Fail Limit: {}", FailLimit);
-		logger.info("send Period: {}", iSendPeriod);
-		logger.info("query Period: {}", iQuertPeriod);
-		logger.info("query Past Period: {}", iQuertPastPeriod);
-        logger.info("AlertMailTo: {}", AlertMailTo);
+		
+
         StressClient stressClient = new StressClient(0, host, port, bulkSize,
                 systemId, password, sourceAddr, destinationAddr,
                 transactionTimer, processorDegree, maxOutstanding);
@@ -1558,6 +1588,8 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		rs.close();
 		conn.close();
 
+		
+		
         stressClient.run();
     }
     
@@ -1675,7 +1707,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     								id.fails++;
     								org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
     								try {
-    									long c = Long.parseLong(id.sndFrom);
+    									Long.parseLong(id.sndFrom);
     									ton = TypeOfNumber.INTERNATIONAL;
     								} catch (NumberFormatException e) {
     									//logger.error("not send from number:" + id.sndFrom + ":");
@@ -1736,7 +1768,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
     							//proccess senfrom
     							org.jsmpp.bean.TypeOfNumber ton = TypeOfNumber.ALPHANUMERIC;
     							try {
-    								long c = Long.parseLong(id.sndFrom);
+    								Long.parseLong(id.sndFrom);
     								ton = TypeOfNumber.INTERNATIONAL;
     							} catch (NumberFormatException e) {
     								//logger.error("Past : not send from number:" + id.sndFrom + ":");
