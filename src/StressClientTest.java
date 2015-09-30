@@ -390,14 +390,14 @@ public class StressClientTest implements Runnable {
 					                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 										//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 										synchronized(getErrorLog()){
-											getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+											getErrorLog().add(errorAddInfo()+"Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 										}
 									}
 								} catch (Exception e2) {
 				                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 									//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 									synchronized(getErrorLog()){
-										getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+										getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 									}
 									reconnect(id.MsgID);
 								}
@@ -466,7 +466,7 @@ public class StressClientTest implements Runnable {
 						                    logger.error("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e3);
 											//sendmail("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 											synchronized(getErrorLog()){
-												getErrorLog().add("Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
+												getErrorLog().add(errorAddInfo()+"Caused by NegativeResponseException , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e3.getMessage());
 											}
 										}
 										reCheck=true;
@@ -474,7 +474,7 @@ public class StressClientTest implements Runnable {
 					                    logger.error("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+")", e2);
 										//sendmail("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 										synchronized(getErrorLog()){
-											getErrorLog().add("Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
+											getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 										}
 										reconnect(id.MsgID);
 										reCheck=true;

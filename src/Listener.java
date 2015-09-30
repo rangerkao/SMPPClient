@@ -31,7 +31,7 @@ public class Listener implements MessageReceiverListener {
 	}
 	
 	public void onAcceptDeliverSm(DeliverSm deliverSm)	throws ProcessRequestException {
-        
+		
         if (MessageType.SMSC_DEL_RECEIPT.containedIn(deliverSm.getEsmClass())) {
             // this message is delivery receipt
             try {
@@ -64,7 +64,7 @@ public class Listener implements MessageReceiverListener {
 							+ 	"FinalStatus\t:\t"+status+"\n"
 							+ 	"FinalStatus value\t:\t"+statusValue+"\n"
 							+ 	"Text\t:\t"+delReceipt.getText()+"\n"
-							+ 	"Error\t:\t"+delReceipt.getError()+"\n");           
+							+ 	"Error\t:\t"+delReceipt.getError()+"\n");         
 
                 processDB(id,statusValue,doneDate);
                
