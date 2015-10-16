@@ -51,7 +51,7 @@ import org.jsmpp.session.QuerySmResult;
 import org.jsmpp.bean.MessageClass;
 import org.jsmpp.bean.Alphabet;
 
-public class StressClientTest implements Runnable {
+public class StressClient implements Runnable {
     private static final String DEFAULT_PASSWORD = "test17";
     private static final String DEFAULT_SYSID = "17life";
     private static Logger logger;
@@ -64,6 +64,7 @@ public class StressClientTest implements Runnable {
     private static final Integer DEFAULT_MAX_OUTSTANDING = 10;
     
     private static Integer THREADCOUNT=100;
+    private static Integer SENDRATE=8;
     private AtomicInteger requestCounter = new AtomicInteger();
   //not use at 20150820 mark
     /*private AtomicInteger totalRequestCounter = new AtomicInteger();
@@ -76,7 +77,7 @@ public class StressClientTest implements Runnable {
     @SuppressWarnings("unused")
 	private int id;
     private int port;
-    private int bulkSize;
+    //private int bulkSize;
     private SMPPSession smppSession = new SMPPSession();
     private AtomicBoolean exit = new AtomicBoolean();
     private static String systemId;
@@ -123,21 +124,21 @@ public class StressClientTest implements Runnable {
 			public boolean inserted=false;
 		}
 		
-		private ArrayList<msgStatus> qryMsg= new ArrayList<msgStatus>();
+		//private ArrayList<msgStatus> qryMsg= new ArrayList<msgStatus>();
 		private ArrayList<msgStatus> sndMsg= new ArrayList<msgStatus>();
 		private static ArrayList<String> ErrorLog= new ArrayList<String>();
 		
 		//20150210
 		private ArrayList<msgStatus> qryMsgPast= new ArrayList<msgStatus>();
 		
-    public StressClientTest(int id, String host, int port, int bulkSize,
+    public StressClient(int id, String host, int port, int bulkSize,
             String systemId, String password, String sourceAddr,
             String destinationAddr, long transactionTimer,
             int pduProcessorDegree, int maxOutstanding) {
     	this.id = id;
         this.host = host;
         this.port = port;
-        this.bulkSize = bulkSize;
+        //this.bulkSize = bulkSize;
       //not use at 20150820 mark
         this.systemId = systemId;
         this.password = password;
@@ -320,6 +321,7 @@ public class StressClientTest implements Runnable {
 		qryMsgPast.clear();
 	}
 	
+	
 
 	private Runnable QueryPastTask(final msgStatus id) {
 	    return new Runnable() {
@@ -337,7 +339,7 @@ public class StressClientTest implements Runnable {
 				String sql4 = "update responselog set acktime=?,status=?,updatetime=now() where msgid=? and phoneno=? ";
 				
 				
-				bulkSize=0;
+				//bulkSize=0;
 				
 				try{
 					conn= DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
@@ -636,7 +638,12 @@ public class StressClientTest implements Runnable {
         
         Thread QEX = new QueryExpired();
         QEX.start();
-  
+        
+        //20151015 add
+        Thread SSC = new sendSMSControl();
+        SSC.start();
+        
+        
 		Connection conn = null;
 		Statement st=null;
 		Statement csUpdate=null;
@@ -645,10 +652,11 @@ public class StressClientTest implements Runnable {
 		ResultSet rs2 = null;
 
 		while (!exit.get()) {
+			logger.info("Start select ... ");
 			//20141030 if THREADCOUNT is less than 10
-			int sNum=THREADCOUNT-10;
-			if(sNum<0)
-				sNum=0;
+			//int sNum=THREADCOUNT-10;
+			//if(sNum<0)
+				//sNum=0;
 			
 			//int zk=0;
 			
@@ -684,7 +692,7 @@ public class StressClientTest implements Runnable {
 				
 				grouplist.clear();
 				sndMsg.clear();
-				bulkSize=0;
+				//bulkSize=0;
 				
 				//update needed to 98
 				csUpdate = conn.createStatement();
@@ -720,6 +728,8 @@ public class StressClientTest implements Runnable {
 							+ "and m.userid='"+userid+"' and "+("0".equals(schedule)?"i.schedule='0' ":"i.schedule!='0' ")
 							+ "order by tries limit "+(THREADCOUNT-requestCounter.get());
 					
+					logger.info("select "+userid+" schedule="+schedule+" SMS . Total "+THREADCOUNT);
+					
 					//logger.info(sql);
 					rs2 = st.executeQuery(sql);
 					
@@ -739,13 +749,14 @@ public class StressClientTest implements Runnable {
 						}
 						
 						synchronized(sndMsg) {
+							requestCounter.incrementAndGet();
 							sndMsg.add(mm);
 						}
 					}
 					
-					bulkSize=sndMsg.size();
+					//bulkSize=sndMsg.size();
 					
-					for (int i = 0; i < bulkSize && !exit.get(); i++) {
+					/*for (int i = 0; i < bulkSize && !exit.get(); i++) {
 						msgStatus tmm=null;
 						synchronized(sndMsg) {
 							tmm=sndMsg.get(i);
@@ -755,6 +766,9 @@ public class StressClientTest implements Runnable {
 							synchronized(qryMsg) {
 								qryMsg.add(tmm);
 							}
+							//20151015 add
+							String sql3="update msgitem set status=93 where msgid='"+tmm.MsgID+"' and seq="+tmm.MsgSeq+" ";
+							st.executeUpdate(sql3);
 						}
 						
 						while(requestCounter.get()>sNum){
@@ -771,15 +785,16 @@ public class StressClientTest implements Runnable {
 						Thread.sleep(iSendPeriod);
 					} catch (InterruptedException e) {
 					}
-					logger.info("Sended " + bulkSize + " message...");
+					logger.info("Sended " + bulkSize + " message...");*/
 				}
-				if(bulkSize==0){
+				/*if(bulkSize==0){
 					try {
 						Thread.sleep(iSendPeriod);
 					} catch (InterruptedException e) {
 					}
 					logger.info("Sended " + bulkSize + " message...");
-				}
+				}*/
+				
 			} catch (SQLException e1) {
 				logger.error("At run get exception",e1);
 				synchronized(getErrorLog()){
@@ -806,6 +821,12 @@ public class StressClientTest implements Runnable {
 						getErrorLog().add(errorAddInfo()+"run at close Connection got Exception. "+"Error Msg"+e.getMessage());
 					}
 				}
+			}
+			
+			//20151015 add
+			try {
+				Thread.sleep(iSendPeriod);
+			} catch (InterruptedException e) {
 			}
         }
         logger.info("Send Thread Finished");
@@ -1114,7 +1135,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                	if(msg.MsgBody==null)
 	                		throw new Exception("MsgBodyisNull!");	
 	                	
-						requestCounter.incrementAndGet();
+						//requestCounter.incrementAndGet();
 						//System.out.println("The "+requestCounter.get()+"th msg Start send! ");
 						long startTime = System.currentTimeMillis();
 						if( msg.MsgBody.getBytes().length == msg.MsgBody.length()){
@@ -1217,15 +1238,16 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 						msg.status=95;
 					}finally{
 						//logger.info("The "+requestCounter.get()+"th msg sending end ! ");
-							requestCounter.decrementAndGet();	
+							//requestCounter.decrementAndGet();	
 					}
 					
 					if(msg.status==95 ){
 						msg.isres=false;
 						msg.tries=msg.tries+1;
-						synchronized (qryMsg) {
+						
+						/*synchronized (qryMsg) {
 							qryMsg.remove(msg);
-						}
+						}*/
 					}
 					
 					
@@ -1347,9 +1369,28 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		 int maxOutstanding;
 		 maxOutstanding = DEFAULT_MAX_OUTSTANDING;
         
+		 
+		FileInputStream fis = new FileInputStream("StressClient.properties");
+        Properties prop = new Properties();
+        prop.load(fis);
+        fis.close();
+		Host_IP=prop.getProperty("Host_IP");
+		RetryLimit=prop.getProperty("RetryLimit");
+		FailLimit=prop.getProperty("FailLimit");
+		iFailLimit=Integer.parseInt(FailLimit);
+		SendPeriod=prop.getProperty("SendPeriod");
+		iSendPeriod=Integer.parseInt(SendPeriod);
+		QuertPeriod=prop.getProperty("QueryPeriod");
+		iQuertPeriod=Integer.parseInt(QuertPeriod);
+		QuertPastPeriod=prop.getProperty("QueryPastPeriod");
+		iQuertPastPeriod=Integer.parseInt(QuertPastPeriod);
+		AlertMailTo=prop.getProperty("AlertMailTo");
+		if(prop.getProperty("DEFAULT_HOST")!=null)
+		DEFAULT_HOST=prop.getProperty("DEFAULT_HOST");
+		 
         String log4jPath =DEFAULT_LOG4J_PATH;
         PropertyConfigurator.configure(log4jPath);
-        logger =Logger.getLogger(StressClientTest.class);
+        logger =Logger.getLogger(StressClient.class);
         logger.info("Target server "+ host+" "+port);
         logger.info("System ID: "+ systemId);
         logger.info("Password: "+ password);
@@ -1366,9 +1407,12 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
         if (args.length > 0) {
             try {
             	
-                THREADCOUNT = Integer.parseInt(args[0]);
-                //THREADCOUNT = 3;
-                throw new NumberFormatException();
+            	//20151015 mod
+            	SENDRATE = Integer.parseInt(args[0]);
+                if(SENDRATE == null)
+                	throw new Exception("Error Parameter!");
+            	//THREADCOUNT = Integer.parseInt(args[0]);
+            	THREADCOUNT = SENDRATE * iSendPeriod;
             }
             catch(NumberFormatException e) {
                 logger.error("Must enter integer as first argument.");
@@ -1378,27 +1422,11 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				DriverManager.setLoginTimeout(10);
  
         
-        FileInputStream fis = new FileInputStream("StressClient.properties");
-        Properties prop = new Properties();
-        prop.load(fis);
-        fis.close();
-        		Host_IP=prop.getProperty("Host_IP");
-				RetryLimit=prop.getProperty("RetryLimit");
-				FailLimit=prop.getProperty("FailLimit");
-				iFailLimit=Integer.parseInt(FailLimit);
-				SendPeriod=prop.getProperty("SendPeriod");
-				iSendPeriod=Integer.parseInt(SendPeriod);
-				QuertPeriod=prop.getProperty("QueryPeriod");
-				iQuertPeriod=Integer.parseInt(QuertPeriod);
-				QuertPastPeriod=prop.getProperty("QueryPastPeriod");
-				iQuertPastPeriod=Integer.parseInt(QuertPastPeriod);
-				AlertMailTo=prop.getProperty("AlertMailTo");
-				if(prop.getProperty("DEFAULT_HOST")!=null)
-				DEFAULT_HOST=prop.getProperty("DEFAULT_HOST");
+        
 				
 		
 
-        StressClientTest stressClient = new StressClientTest(0, host, port, bulkSize,
+        StressClient stressClient = new StressClient(0, host, port, bulkSize,
                 systemId, password, sourceAddr, destinationAddr,
                 transactionTimer, processorDegree, maxOutstanding);
         
@@ -1425,7 +1453,66 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		
         stressClient.run();
     }
-    
+  //20151015 add
+    private class sendSMSControl extends Thread {
+        @Override
+        public void run() {
+            logger.info("Starting sendSMSControl Thread...");
+
+            
+            Connection conn =null;
+            Statement st = null;
+            
+			while (true) {
+				try {
+					//every second for every round
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				if(sndMsg.size()>0){
+					int count = 0;
+					try {
+						conn = DriverManager.getConnection("jdbc:postgresql://127.0.0.1:5432/smppdb?charSet=UTF-8","smpper","SmIpp3r");
+						st = conn.createStatement();
+						
+						synchronized(sndMsg){
+							for(msgStatus m :sndMsg){
+								count++;
+								execService.execute(newSendTask(m));
+								sndMsg.remove(m);
+								requestCounter.decrementAndGet();
+								//20151015 add
+								String sql="update msgitem set status=93 where msgid='"+m.MsgID+"' and seq="+m.MsgSeq+" ";
+								st.executeUpdate(sql);
+								
+								if(count == SENDRATE){
+									break;
+								}
+							}
+						}
+						logger.info("Sendded "+count+" SMS!");
+					} catch (SQLException e) {
+						logger.error("sendSMSControl got SQLException.",e);
+					} catch (Exception e) {
+						logger.error("sendSMSControl got Exception.",e);
+					}finally{
+						
+						try {
+							if(conn!=null)
+								conn.close();
+							if(st!=null)
+								st.close();
+						} catch (SQLException e) {
+						}
+						
+					}
+				}
+				
+			}
+		}
+    }
     //20150312 add
     private class ErrorMailControl extends Thread {
         @Override
