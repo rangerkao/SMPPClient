@@ -51,7 +51,7 @@ import org.jsmpp.session.QuerySmResult;
 import org.jsmpp.bean.MessageClass;
 import org.jsmpp.bean.Alphabet;
 
-public class StressClient implements Runnable {
+public class StressClient_old implements Runnable {
     private static final String DEFAULT_PASSWORD = "test17";
     private static final String DEFAULT_SYSID = "17life";
     private static Logger logger;
@@ -131,7 +131,7 @@ public class StressClient implements Runnable {
 		//20150210
 		private ArrayList<msgStatus> qryMsgPast= new ArrayList<msgStatus>();
 		
-    public StressClient(int id, String host, int port, int bulkSize,
+    public StressClient_old(int id, String host, int port, int bulkSize,
             String systemId, String password, String sourceAddr,
             String destinationAddr, long transactionTimer,
             int pduProcessorDegree, int maxOutstanding) {
@@ -1390,7 +1390,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		 
         String log4jPath =DEFAULT_LOG4J_PATH;
         PropertyConfigurator.configure(log4jPath);
-        logger =Logger.getLogger(StressClient.class);
+        logger =Logger.getLogger(StressClient_old.class);
         logger.info("Target server "+ host+" "+port);
         logger.info("System ID: "+ systemId);
         logger.info("Password: "+ password);
@@ -1426,7 +1426,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 				
 		
 
-        StressClient stressClient = new StressClient(0, host, port, bulkSize,
+        StressClient_old stressClient = new StressClient_old(0, host, port, bulkSize,
                 systemId, password, sourceAddr, destinationAddr,
                 transactionTimer, processorDegree, maxOutstanding);
         
