@@ -146,7 +146,7 @@ public class Listener implements MessageReceiverListener {
 			String isres =null;
 			
 			if(!"0".equals(count)){
-				//µuÂ²°T³B²z
+				//çŸ­ç°¡è¨Šè™•ç†
 				sql = "select msgid,seq from msgitem where rspid ='"+id+"' ";
 				rs = st.executeQuery(sql);
 				ListenerLogger.info("Execute select:"+sql);	
@@ -162,7 +162,7 @@ public class Listener implements MessageReceiverListener {
 				st.executeUpdate(sql);
 				ListenerLogger.info("Execute update:"+sql);	
 			}else{
-				//ªøÂ²°T³B²z
+				//é•·ç°¡è¨Šè™•ç†
 				sql = "select msgid,seq from longmsgitem where rspid ='"+id+"' ";
 				rs = st.executeQuery(sql);
 				ListenerLogger.info("Execute select:"+sql);	
@@ -180,7 +180,7 @@ public class Listener implements MessageReceiverListener {
 				
 				
 				
-				//³B²z¥DÂ²°T¸ê®Æ
+				//è™•ç†ä¸»ç°¡è¨Šè³‡æ–™
 				boolean success = true;
 				boolean reject = false;
 				boolean routing = false;

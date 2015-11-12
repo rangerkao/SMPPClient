@@ -3,9 +3,9 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
-	<classpathentry kind="lib" path="G:/MegaSync/download/jsmpp-2.1.0-all/jsmpp-2.1.0/jsmpp-2.1.0.jar"/>
 	<classpathentry kind="lib" path="G:/MegaSync/download/jar/log4j-1.2.17.jar"/>
-	<classpathentry kind="lib" path="G:/MegaSync/download/slf4j-api-1.7.7.jar"/>
-	<classpathentry kind="lib" path="G:/MegaSync/download/javatar-2.5/jars/tar.jar"/>
+	<classpathentry kind="lib" path="G:/MegaSync/download/jar/jsmpp-2.1.0-all/jsmpp-2.1.0/jsmpp-2.1.0.jar"/>
+	<classpathentry kind="lib" path="G:/MegaSync/download/jar/slf4j-api-1.7.7.jar"/>
+	<classpathentry kind="lib" path="G:/MegaSync/download/jar/javatar-2.5/jars/tar.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

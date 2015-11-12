@@ -2,20 +2,20 @@
 /**
  * Program History
  * 
- * 20140904 µ{¦¡±µ¤â
- * 20141103 §¹¦¨Â_½u­«³s
- * 20141103 ·s¼Wselect¤W­­­­¨î¡Aºû«ùµo°eÀx¦C­Ó¼Æ
- * 20141103 ·s¼W¨â¤Ñ«á¤£¬d(96¹O®É)¥\¯à
- * 20141103 ·s¼Wµo°e¥¢±Ñ(95)ª¬ºA¡A¨Ã¥i­«·sselect¶i¦æµo°e
- * 20141103 ­×§ï³Ì²×ª¬ºA©w¸q¡A¥u¦³0¡B1¬°»İ¬d¸ßª¬ºA
- * 20141106 §¹¦¨ªøÂ²°T¬d¸ß¥\¯à¡A¨Ã°O¿ı©ótable
- * 20141112 ­×§ï7¤£¬O³Ì²×ª¬ºA
- * 20141223 ·s¼W10¤ÀÄÁ¦^ÂĞACK¥\¯à
- * 20150128 ±NQUERY§ï¬°1441¦¸¡]¨C¤ÀÄÁ¤@¦¸¡^
- * 20150213 ±NQUERY §ï¬°289¦¸¡]¨C¤­¤ÀÄÁ¦¸¡^
- * 20150210 ·s¼W¬d¸ß¹L¥h¥¼§¹¦¨¥\¯à
- * 20150311 ­×§ïÄµ¥ÜÂ²°T¶°¦X«á¨C10¤ÀÄÁµo°e
- * 20150316 ¬d¸ß¹L¥h¥\¯à¡A·s¼W97§@¬°»İ¬d¸ßª¬ºA
+ * 20140904 ç¨‹å¼æ¥æ‰‹
+ * 20141103 å®Œæˆæ–·ç·šé‡é€£
+ * 20141103 æ–°å¢selectä¸Šé™é™åˆ¶ï¼Œç¶­æŒç™¼é€å„²åˆ—å€‹æ•¸
+ * 20141103 æ–°å¢å…©å¤©å¾Œä¸æŸ¥(96é€¾æ™‚)åŠŸèƒ½
+ * 20141103 æ–°å¢ç™¼é€å¤±æ•—(95)ç‹€æ…‹ï¼Œä¸¦å¯é‡æ–°selecté€²è¡Œç™¼é€
+ * 20141103 ä¿®æ”¹æœ€çµ‚ç‹€æ…‹å®šç¾©ï¼Œåªæœ‰0ã€1ç‚ºéœ€æŸ¥è©¢ç‹€æ…‹
+ * 20141106 å®Œæˆé•·ç°¡è¨ŠæŸ¥è©¢åŠŸèƒ½ï¼Œä¸¦è¨˜éŒ„æ–¼table
+ * 20141112 ä¿®æ”¹7ä¸æ˜¯æœ€çµ‚ç‹€æ…‹
+ * 20141223 æ–°å¢10åˆ†é˜å›è¦†ACKåŠŸèƒ½
+ * 20150128 å°‡QUERYæ”¹ç‚º1441æ¬¡ï¼ˆæ¯åˆ†é˜ä¸€æ¬¡ï¼‰
+ * 20150213 å°‡QUERY æ”¹ç‚º289æ¬¡ï¼ˆæ¯äº”åˆ†é˜æ¬¡ï¼‰
+ * 20150210 æ–°å¢æŸ¥è©¢éå»æœªå®ŒæˆåŠŸèƒ½
+ * 20150311 ä¿®æ”¹è­¦ç¤ºç°¡è¨Šé›†åˆå¾Œæ¯10åˆ†é˜ç™¼é€
+ * 20150316 æŸ¥è©¢éå»åŠŸèƒ½ï¼Œæ–°å¢97ä½œç‚ºéœ€æŸ¥è©¢ç‹€æ…‹
  * 
  */
 import java.io.IOException;
@@ -171,8 +171,8 @@ public class StressClient implements Runnable {
 			boolean Exit = false;
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
 			
-			//±ø¥ó³]©w¡A¹F¨ì¹O´Á®É­­ÁÙ¥¼¹F³Ì²×ª¬ºA
-			//short SMS ´Á­­¬°1¤Ñ+10¤ÀÄÁ
+			//æ¢ä»¶è¨­å®šï¼Œé”åˆ°é€¾æœŸæ™‚é™é‚„æœªé”æœ€çµ‚ç‹€æ…‹
+			//short SMS æœŸé™ç‚º1å¤©+10åˆ†é˜
 			String sql = 
 					"select b.userid,a.phoneno,a.msgbody,a.msgid,a.seq,a.rspID,a.status,a.sendtime "
 					+ "from msgitem a,messages b "
@@ -201,7 +201,7 @@ public class StressClient implements Runnable {
 					
 					rs=st.executeQuery(sql);
 					
-					//µuÂ²°T
+					//çŸ­ç°¡è¨Š
 					while(rs.next()){
 						msgStatus mm=new msgStatus();
 						mm.sndFrom=rs.getString("userid");
@@ -223,7 +223,7 @@ public class StressClient implements Runnable {
 					}
 					
 					
-					//ªøÂ²°T
+					//é•·ç°¡è¨Š
 					rs=st.executeQuery(sql2);
 					pst=conn.prepareStatement(sql3);
 					while(rs.next()){
