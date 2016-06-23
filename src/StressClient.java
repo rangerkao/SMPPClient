@@ -401,7 +401,7 @@ public class StressClient implements Runnable {
 									synchronized(getErrorLog()){
 										getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 									}
-									reconnect(id.MsgID);
+									reconnect(id);
 								}
 							} else {
 								synchronized (qryMsgPast) {
@@ -478,7 +478,7 @@ public class StressClient implements Runnable {
 										synchronized(getErrorLog()){
 											getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed Query status of message(User:"+id.sndFrom+",msgid:"+id.MsgID+",Seq:"+id.MsgSeq+",number:"+id.sndTo+"). exception:"+ e2.getMessage());
 										}
-										reconnect(id.MsgID);
+										reconnect(id);
 										reCheck=true;
 									}
 								}
@@ -1068,7 +1068,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 		}
 	}
 		
-	void reconnect(String msgID){
+	void reconnect(msgStatus msg){
 		logger.info("reconnect...");
 		//try connect again
 		synchronized(smppSession) {
@@ -1102,11 +1102,12 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 			if(reconnectCount<reconnectLimit){
 				logger.debug("smppSession state is Bounded!");
 			}else{
-				if(msgID!=null){
-					logger.error(errorAddInfo()+" The "+msgID+" Msg cannot send!");
+				if(msg!=null){
+					//XXX
+					logger.error(errorAddInfo()+" Msg cannot send!(id="+msg.MsgID+",seq="+msg.MsgSeq+")");
 					//sendmail(errorAddInfo()+" The "+msgID+" Msg cannot send!");
 					synchronized(getErrorLog()){
-						getErrorLog().add(errorAddInfo()+" The "+msgID+" Msg cannot send!");
+						getErrorLog().add(errorAddInfo()+" Msg cannot send!(id="+msg.MsgID+",seq="+msg.MsgSeq+")");
 					}
 				}
 			}
@@ -1186,7 +1187,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                    synchronized(getErrorLog()){
 							getErrorLog().add(errorAddInfo()+"Caused by PDUException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}					
-	                    reconnect(msg.MsgID);
+	                    reconnect(msg);
 	                    msg.status=95;
 	                    //shutdown();
 	                } catch (ResponseTimeoutException e) {
@@ -1195,7 +1196,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                    synchronized(getErrorLog()){
 							getErrorLog().add(errorAddInfo()+"Caused by ResponseTimeoutException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 	                    }							
-	                    reconnect(msg.MsgID);
+	                    reconnect(msg);
 						msg.status=95;
 	                    //shutdown();
 	                } catch (InvalidResponseException e) {
@@ -1225,7 +1226,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                    synchronized(getErrorLog()){
 							getErrorLog().add(errorAddInfo()+"Caused by IOException , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
-	                    reconnect(msg.MsgID);
+	                    reconnect(msg);
 						msg.status=95;
 	                    //shutdown();
 	                } catch (Exception e){
@@ -1234,7 +1235,7 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 	                    synchronized(getErrorLog()){
 							getErrorLog().add(errorAddInfo()+"Caused by Exception , Failed submit short message(User:"+msg.sndFrom+",msgid:"+msg.MsgID+",Seq:"+msg.MsgSeq+",number:"+msg.sndTo+") Exception Message: "+e.getMessage());
 						}							
-	                    reconnect(msg.MsgID);
+	                    reconnect(msg);
 						msg.status=95;
 					}finally{
 						//logger.info("The "+requestCounter.get()+"th msg sending end ! ");
@@ -1297,7 +1298,6 @@ Also, set data_coding field to UCS2 value.. 0x08 and sm_length to the physical n
 								//20150715 add
 								if(94==msg.status)
 									sql="insert into responselog (msgid,phoneno,sendtime,createtime,status) values(?,?,?,now(),'F') ";
-								//XXX
 								ps = conn.prepareStatement(sql);
 								logger.info("Excute insert new Date to responselog!"+msg.MsgID+","+msg.sndTo);
 								ps.setString(1, msg.MsgID);
